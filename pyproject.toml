@@ -1,0 +1,5 @@
+[tool.uv.workspace]
+members = ["libs/huaweicloud_mcp_core", "server/mcp_server_gaussdb"]
+
+[tool.uv]
+package = false

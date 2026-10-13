@@ -1,0 +1,697 @@
+{
+  "region": "cn-north-4",
+  "instance_id": "<masked-instance-id>",
+  "instance_mode": "basic",
+  "replica_num": 1,
+  "checks": [
+    {
+      "name": "get_instance",
+      "outcome": "passed",
+      "response_keys": [
+        "charge_info",
+        "created",
+        "datastore",
+        "enterprise_project_id",
+        "flavor_info",
+        "flavor_ref",
+        "ha",
+        "id",
+        "instance_mode",
+        "maintenance_window",
+        "name",
+        "port",
+        "private_ips",
+        "region",
+        "replica_num",
+        "security_group_id",
+        "status",
+        "subnet_id",
+        "time_zone",
+        "type",
+        "updated",
+        "volume",
+        "vpc_id"
+      ]
+    },
+    {
+      "name": "get_instance_parameters",
+      "outcome": "passed",
+      "response_keys": [
+        "count",
+        "items",
+        "marker",
+        "total",
+        "truncated"
+      ]
+    },
+    {
+      "name": "list_backups",
+      "outcome": "passed",
+      "response_keys": [
+        "count",
+        "items",
+        "marker",
+        "total",
+        "truncated"
+      ]
+    },
+    {
+      "name": "get_backup_policy",
+      "outcome": "passed",
+      "response_keys": [
+        "backup_policy",
+        "instance_id"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_deployment_form",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "each_expand_nodes",
+        "each_shard_num",
+        "initial_node_num",
+        "max_shard_count",
+        "replica_num",
+        "shard_num",
+        "solution"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_component_infos",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "nodes",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_instance_tags",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "tags",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:search_auto_enlarge_policy",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "limit_volume_size",
+        "max_volume_size",
+        "min_volume_size",
+        "percents",
+        "step_percent",
+        "step_size",
+        "switch_option",
+        "trigger_available_percent"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_ssl_cert_download_link",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "download_link"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_backup_policy",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "backup_policy"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_databases",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "databases",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_db_users",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "total_count",
+        "users"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_database_roles",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "roles",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_database_volume_summary",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "cn_components",
+        "data_disk_capacity",
+        "data_disk_usage",
+        "dn_components",
+        "estimated_remaining_days",
+        "space_usage_growth_per_day"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_readonly_nodes",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "max_readonly_node_num",
+        "nodes"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_instance_disk",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "total",
+        "used"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_instance_param_group",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "configuration_parameters",
+        "created",
+        "datastore_name",
+        "datastore_version",
+        "updated"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_instance_configuration",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "configuration_parameters",
+        "created",
+        "datastore_name",
+        "datastore_version",
+        "updated"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_upgrade_candidate_versions",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "hotfix_rollback_candidate_versions",
+        "hotfix_rollback_infos",
+        "hotfix_upgrade_candidate_versions",
+        "hotfix_upgrade_infos",
+        "roll_upgrade_progress",
+        "rollback_enabled",
+        "source_version",
+        "target_version",
+        "upgrade_candidate_versions",
+        "upgrade_type_list"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_hba_infos",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "hba_confs",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_kernel_plugins",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "body"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_features",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "features"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_error_log_switch_status",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "status"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_instance_error_logs",
+      "outcome": "passed_after_retry",
+      "error_code": "DBS.280409",
+      "error_message": "日期格式错误.",
+      "resolution": "Used the documented numeric timezone offset format, for example +0800."
+    },
+    {
+      "name": "invoke_read_openapi:list_binded_eips",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "public_ips",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_d_nat_info",
+      "outcome": "environment_unsupported",
+      "error_code": "DBS.06280105",
+      "error_message": "此功能特性未启用。",
+      "resolution": "Huawei Cloud returned DBS.06280105: this feature is not enabled for the test environment."
+    },
+    {
+      "name": "invoke_read_openapi:list_lts_configs",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "instance_lts_configs",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_metric_datas",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "instances",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_full_sql_switches",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "allowed_sql_types",
+        "full_sql_switches",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_wdr_snapshot_status",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "end_time",
+        "start_time",
+        "status"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_limit_task",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "limit",
+        "limit_task_list",
+        "offset",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_schedule_task",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "tasks",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_cross_cloud_disaster_relations",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "relations",
+        "total"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_recycle_policy",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "retention_period_in_days"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_support_kernel_plugins",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "body"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_instances_statistics",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "instances_statistics",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:show_alarm_statistics",
+      "outcome": "passed_after_retry",
+      "error_code": "400",
+      "error_message": "{\"errCode\":\"DBS.280409\",\"externalMessage\":\"日期格式错误。\"}",
+      "resolution": "Used the documented numeric timezone offset format, for example +0800."
+    },
+    {
+      "name": "invoke_write_openapi:add_instance_tags",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "instance_id",
+        "instance_name"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_instance_tags",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "tags",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_write_openapi:update_instance_alias",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_write_openapi:create_db_user",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_write_openapi:create_database",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_write_openapi:create_database_schemas",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_write_openapi:allow_db_privileges",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_read_openapi:list_databases",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "databases",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_db_users",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "total_count",
+        "users"
+      ]
+    },
+    {
+      "name": "invoke_read_openapi:list_database_schemas",
+      "outcome": "passed",
+      "response_keys": [
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "database_schemas",
+        "total_count"
+      ]
+    },
+    {
+      "name": "invoke_dangerous_openapi:delete_database_schema",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_dangerous_openapi:delete_database",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": []
+    },
+    {
+      "name": "invoke_dangerous_openapi:delete_instance_tag",
+      "outcome": "passed",
+      "response_keys": [
+        "hints",
+        "operation",
+        "result",
+        "risk"
+      ],
+      "result_keys": [
+        "instance_id",
+        "instance_name",
+        "result"
+      ]
+    },
+    {
+      "name": "analyze_slow_sql",
+      "outcome": "passed_after_fix",
+      "response_keys": [
+        "analysis",
+        "count",
+        "hints",
+        "items",
+        "marker",
+        "total",
+        "truncated"
+      ],
+      "resolution": "Made threshold a validated 1-99 second parameter with default 1."
+    },
+    {
+      "name": "verify_temporary_tag_deleted",
+      "outcome": "passed"
+    },
+    {
+      "name": "verify_temporary_database_deleted",
+      "outcome": "passed"
+    }
+  ],
+  "summary": {
+    "passed": 52,
+    "environment_unsupported": 1,
+    "failed": 0
+  },
+  "cleanup": {
+    "delete_job_id": "<redacted-delete-job-id>",
+    "delete_status": "Completed",
+    "ended": "2026-10-09T04:47:43.061Z",
+    "instance_list_count_after_delete": 0,
+    "recycle_status": "Active",
+    "billing_note": "Huawei Cloud documentation states that instances awaiting rebuild in the recycle bin do not incur charges."
+  }
+}

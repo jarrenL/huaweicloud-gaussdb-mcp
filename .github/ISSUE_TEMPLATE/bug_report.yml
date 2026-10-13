@@ -1,0 +1,52 @@
+name: Bug report
+description: Report reproducible incorrect behavior in the GaussDB MCP server
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include AK/SK values, security tokens, account identifiers, private endpoints, or unmasked cloud responses. Report security issues privately according to SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version and installation method
+      placeholder: 0.3.3 via uvx
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio
+        - Streamable HTTP
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Describe what happened and include masked errors or audit events.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include the tool name and a minimal request with all sensitive values replaced.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python, operating system, region name, client, and relevant non-secret configuration.
+    validations:
+      required: true

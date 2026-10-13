@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a GaussDB MCP capability or behavior change
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: User scenario
+      description: What task should a user or agent be able to complete?
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Huawei Cloud API
+      description: Link the relevant public API and list the expected IAM actions, if known.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Expected risk class
+      options:
+        - READ
+        - WRITE
+        - DANGEROUS
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected tool behavior
+      description: Describe inputs, output, confirmation, and cleanup requirements.
+    validations:
+      required: true

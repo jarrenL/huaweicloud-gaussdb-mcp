@@ -1,0 +1,28 @@
+{
+  "validated_at": "2026-10-09",
+  "region": "cn-north-4",
+  "engine_version": "10.0.0",
+  "read_only": true,
+  "warning": "These counts and codes are a point-in-time validation result. The MCP queries them at runtime and does not embed them as regional defaults.",
+  "centralized": {
+    "deployment_forms": [
+      {"value": "single", "initial_node_num": 1, "replica_num": 1, "shard_num": 1},
+      {"value": "triset", "initial_node_num": 3, "replica_num": 3, "shard_num": 1},
+      {"value": "logger", "initial_node_num": 3, "replica_num": 3, "shard_num": 1}
+    ]
+  },
+  "distributed": {
+    "basic": {
+      "deployment_form": "combined",
+      "flavor_query_ha_mode": "combined",
+      "available_flavor_count_at_validation": 11
+    },
+    "enterprise": {
+      "deployment_form": "hws",
+      "flavor_query_ha_mode": "enterprise",
+      "available_flavor_count_at_validation": 12
+    }
+  },
+  "storage_types_at_validation": ["ULTRAHIGH"],
+  "mutating_calls": 0
+}

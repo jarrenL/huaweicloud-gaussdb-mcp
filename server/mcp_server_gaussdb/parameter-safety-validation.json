@@ -1,0 +1,26 @@
+{
+  "validated_at": "2026-10-09",
+  "region": "cn-north-4",
+  "read_only": true,
+  "cloud_metadata_checked": [
+    "name",
+    "value",
+    "readonly",
+    "value_range",
+    "type",
+    "description",
+    "restart_required"
+  ],
+  "observed_parameter_template_count": 10,
+  "sample_template_parameter_count": 27,
+  "mutating_calls": 0,
+  "local_safety_tests": {
+    "unknown_parameter_blocked": true,
+    "readonly_parameter_blocked": true,
+    "unproven_modifiability_blocked": true,
+    "clear_type_and_range_validation": true,
+    "no_op_skips_write": true,
+    "high_risk_preview_requires_confirm": true,
+    "live_metadata_fetched_before_each_write": true
+  }
+}

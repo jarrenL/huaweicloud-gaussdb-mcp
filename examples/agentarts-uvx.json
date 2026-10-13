@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "huaweicloud-gaussdb": {
+      "command": "uvx",
+      "args": ["mcp-server-huaweicloud-gaussdb"],
+      "env": {
+        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
+        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
+        "HUAWEICLOUD_REGION": "cn-north-4",
+        "HUAWEICLOUD_PROJECT_ID": "${HUAWEICLOUD_PROJECT_ID}",
+        "HUAWEICLOUD_SECURITY_TOKEN": "${HUAWEICLOUD_SECURITY_TOKEN}"
+      }
+    }
+  }
+}

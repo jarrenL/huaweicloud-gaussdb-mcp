@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --all-packages --all-groups
+      - run: uv run --package huaweicloud-mcp-core ruff check libs/huaweicloud_mcp_core/src libs/huaweicloud_mcp_core/tests
+      - run: uv run --package mcp-server-huaweicloud-gaussdb ruff check server/mcp_server_gaussdb/src server/mcp_server_gaussdb/tests
+      - run: cd libs/huaweicloud_mcp_core && uv run --package huaweicloud-mcp-core mypy src tests && uv run --package huaweicloud-mcp-core pytest
+      - run: cd server/mcp_server_gaussdb && uv run --package mcp-server-huaweicloud-gaussdb mypy src && uv run --package mcp-server-huaweicloud-gaussdb pytest
+      - run: uv build --package huaweicloud-mcp-core && uv build --package mcp-server-huaweicloud-gaussdb
