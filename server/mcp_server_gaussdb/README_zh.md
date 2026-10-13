@@ -160,19 +160,19 @@ mcp-server-huaweicloud-gaussdb
 从开源仓开发版运行：
 
 ```bash
-uvx --from "git+https://github.com/<org>/huaweicloud-mcp.git#subdirectory=server/mcp_server_gaussdb" mcp-server-huaweicloud-gaussdb
+uvx --from "git+https://github.com/jarrenL/huaweicloud-gaussdb-mcp.git#subdirectory=server/mcp_server_gaussdb" mcp-server-huaweicloud-gaussdb
 ```
 
 上面的 Git UVX 方式要求公共核心包已先发布到 PyPI。需要修改源码时使用工作区方式：
 
 ```bash
-git clone https://github.com/<org>/huaweicloud-mcp.git
-cd huaweicloud-mcp
+git clone https://github.com/jarrenL/huaweicloud-gaussdb-mcp.git
+cd huaweicloud-gaussdb-mcp
 uv sync --all-packages
 uv run mcp-server-huaweicloud-gaussdb
 ```
 
-`<org>` 需在正式开源时替换为实际 GitHub 组织。Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX 包。
+Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX 包。
 
 ## 配置
 
