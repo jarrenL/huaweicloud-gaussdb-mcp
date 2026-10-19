@@ -52,6 +52,8 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in tuple(os.environ):
         if key.startswith("HUAWEICLOUD_") or key.startswith("MCP_SERVER_"):
             monkeypatch.delenv(key, raising=False)
+    # Keep tests independent from a developer's real devkit account.
+    monkeypatch.setenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS", "1")
 
 
 def _write_credentials(path: Path, access_key: str) -> None:
@@ -88,6 +90,118 @@ def test_credential_file_permissions_fail_closed(
     path.chmod(0o644)
     monkeypatch.setenv("HUAWEICLOUD_MCP_CREDENTIALS_FILE", str(path))
     with pytest.raises(McpToolError, match="credential file") as caught:
+        McpSettings.from_env()
+    assert caught.value.code == "MCP_CREDENTIAL_ERROR"
+
+
+def _write_devkit_credentials(path: Path, access_key: str = "devkit-ak") -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "ak": access_key,
+                "sk": "devkit-sk",
+                "securityToken": "devkit-token",
+                "region": "cn-southwest-2",
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o644)
+
+
+def test_devkit_credentials_are_used_as_permissive_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "devkit.json"
+    _write_devkit_credentials(path)
+    monkeypatch.delenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS")
+    monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(path))
+
+    settings = McpSettings.from_env()
+
+    assert settings.access_key == "devkit-ak"
+    assert settings.secret_key == "devkit-sk"
+    assert settings.security_token == "devkit-token"
+    assert settings.region == "cn-southwest-2"
+
+
+def test_default_devkit_path_is_hot_reloaded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / ".config" / "huaweicloud" / "credentials.json"
+    path.parent.mkdir(parents=True)
+    _write_devkit_credentials(path, "first")
+    monkeypatch.delenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS")
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    assert McpSettings.from_env().access_key == "first"
+    replacement = path.with_suffix(".next")
+    _write_devkit_credentials(replacement, "second")
+    replacement.replace(path)
+    assert McpSettings.from_env().access_key == "second"
+
+
+def test_environment_and_mcp_file_override_devkit_by_field(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mcp_path = tmp_path / "mcp.json"
+    _write_credentials(mcp_path, "mcp-ak")
+    devkit_path = tmp_path / "devkit.json"
+    _write_devkit_credentials(devkit_path)
+    monkeypatch.delenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS")
+    monkeypatch.setenv("HUAWEICLOUD_MCP_CREDENTIALS_FILE", str(mcp_path))
+    monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(devkit_path))
+    monkeypatch.setenv("HUAWEICLOUD_ACCESS_KEY", "env-ak")
+    monkeypatch.setenv("HUAWEICLOUD_REGION", "cn-north-4")
+
+    settings = McpSettings.from_env()
+
+    assert settings.access_key == "env-ak"
+    assert settings.secret_key == "secret"
+    assert settings.region == "cn-north-4"
+    assert settings.project_id == "project"
+    assert settings.security_token is None
+
+
+def test_devkit_fills_only_missing_explicit_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "devkit.json"
+    _write_devkit_credentials(path)
+    monkeypatch.delenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS")
+    monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(path))
+    monkeypatch.setenv("HUAWEICLOUD_ACCESS_KEY", "env-ak")
+    monkeypatch.setenv("HUAWEICLOUD_REGION", "cn-north-4")
+
+    settings = McpSettings.from_env()
+
+    assert settings.access_key == "env-ak"
+    assert settings.secret_key == "devkit-sk"
+    assert settings.region == "cn-north-4"
+    assert settings.security_token == "devkit-token"
+
+
+def test_devkit_fallback_can_be_disabled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "devkit.json"
+    _write_devkit_credentials(path)
+    monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(path))
+
+    with pytest.raises(McpToolError, match="Missing required configuration"):
+        McpSettings.from_env()
+
+
+def test_explicit_invalid_devkit_file_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "devkit.json"
+    path.write_text("[]", encoding="utf-8")
+    path.chmod(0o644)
+    monkeypatch.delenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS")
+    monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(path))
+
+    with pytest.raises(McpToolError, match="huaweicloud-devkit") as caught:
         McpSettings.from_env()
     assert caught.value.code == "MCP_CREDENTIAL_ERROR"
 

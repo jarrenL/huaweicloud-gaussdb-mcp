@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.3.6`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.3.7`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -12,15 +12,17 @@ This MCP server exposes Huawei Cloud GaussDB management APIs to AgentArts, Offic
 
 ## Quick start
 
-Prepare Python 3.10+, `uv`, and a Huawei Cloud credential with GaussDB read permissions. Begin in read-only mode:
+Prepare Python 3.10+, `uv`, and a Huawei Cloud credential with GaussDB read permissions. If
+`huaweicloud-devkit` is configured, the MCP automatically reuses
+`~/.config/huaweicloud/credentials.json`. Begin in read-only mode:
 
 ```bash
-export HUAWEICLOUD_ACCESS_KEY="<your-access-key>"
-export HUAWEICLOUD_SECRET_KEY="<your-secret-key>"
-export HUAWEICLOUD_REGION="cn-north-4"
 export HUAWEICLOUD_MCP_READ_ONLY="true"
 uvx mcp-server-huaweicloud-gaussdb
 ```
+
+Without devkit, set `HUAWEICLOUD_ACCESS_KEY`, `HUAWEICLOUD_SECRET_KEY`, and
+`HUAWEICLOUD_REGION` explicitly as before.
 
 Generic stdio client configuration:
 
@@ -31,9 +33,6 @@ Generic stdio client configuration:
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4",
         "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
@@ -54,7 +53,7 @@ Database / cloud resource management / operations automation.
 - Select product type and a live-verified deployment form explicitly; discovery defaults to a basic single replica for development validation.
 - Create and inspect backups and manage automatic backup policies.
 - Inspect and update parameters, analyze slow SQL, and track asynchronous jobs.
-- Hot-reload AK/SK and temporary security tokens from a protected credential file.
+- Reuse devkit S1 credentials or hot-reload AK/SK and temporary tokens from an MCP credential file.
 - Read-only mode, block/confirm/warn rules, recursive masking, and JSONL audit output.
 
 ## Available Tools
@@ -78,7 +77,7 @@ Database / cloud resource management / operations automation.
 
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.3.6` discovers 265 request operations from SDK `3.1.217`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.3.7` discovers 265 request operations from SDK `3.1.217`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
 
@@ -148,11 +147,17 @@ This Python server uses the UVX/PIP distribution path and does not duplicate the
 
 ## Configuration
 
-Required environment variables are `HUAWEICLOUD_ACCESS_KEY`, `HUAWEICLOUD_SECRET_KEY`, and `HUAWEICLOUD_REGION`. `HUAWEICLOUD_PROJECT_ID` is optional and is discovered through IAM when omitted. Temporary credentials can use `HUAWEICLOUD_SECURITY_TOKEN`.
+Credential values resolve per field in this order: explicit environment variables, the MCP file
+named by `HUAWEICLOUD_MCP_CREDENTIALS_FILE`, then the devkit S1 file at
+`~/.config/huaweicloud/credentials.json`. The S1 keys `ak`, `sk`, `securityToken`, and `region`
+map to the corresponding MCP settings. Override its path with
+`HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE`, or disable reuse with
+`HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS=1`. `HUAWEICLOUD_PROJECT_ID` remains optional and is
+discovered through IAM when omitted; project and domain IDs are not read from devkit.
 
 Project discovery uses `https://iam.myhuaweicloud.com` by default. Override it with `HUAWEICLOUD_IAM_ENDPOINT` for another Huawei Cloud partition or IAM endpoint.
 
-For hot reload, set `HUAWEICLOUD_MCP_CREDENTIALS_FILE` to a mode-`0600` JSON file containing `access_key`, `secret_key`, `region`, and optional `project_id`, `domain_id`, and `security_token`. The file is re-read for every tool invocation. Replace it atomically during rotation.
+For MCP-managed hot reload, set `HUAWEICLOUD_MCP_CREDENTIALS_FILE` to a mode-`0600` JSON file containing `access_key`, `secret_key`, `region`, and optional `project_id`, `domain_id`, and `security_token`. The devkit-owned file does not receive the MCP `0600` check, but must still be a regular JSON object. Both sources are re-read for every tool invocation.
 
 Set `HUAWEICLOUD_MCP_READ_ONLY=true` to block writes. Use `HUAWEICLOUD_MCP_GUARDRAILS_CONFIG` for YAML rules and `HUAWEICLOUD_MCP_AUDIT_FILE` for an optional JSONL audit file. See the files under `../../examples/` and the [Chinese guide](README_zh.md) for the full variable table and protection-boundary notes.
 
@@ -165,9 +170,7 @@ Set `HUAWEICLOUD_MCP_READ_ONLY=true` to block writes. Use `HUAWEICLOUD_MCP_GUARD
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4"
+        "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
   }

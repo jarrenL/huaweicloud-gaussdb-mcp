@@ -4,7 +4,7 @@
 
 Open-source MCP servers for Huawei Cloud database management. The current release focuses on **GaussDB** and excludes DRS. It exposes instance, backup, resize, expansion, restart, parameter, slow-SQL, and asynchronous-job management through standard MCP tools for AgentArts, OfficeACE, CodeArts MCP Marketplace, and other MCP-compatible clients.
 
-Current version: `0.3.6`; Python `3.10+`; transports: stdio and Streamable HTTP; license: Apache-2.0.
+Current version: `0.3.7`; Python `3.10+`; transports: stdio and Streamable HTTP; license: Apache-2.0.
 
 ## Highlights
 
@@ -13,12 +13,16 @@ Current version: `0.3.6`; Python `3.10+`; transports: stdio and Streamable HTTP;
 - Live discovery of project, region, engine version, deployment form, flavor, AZ, VPC, subnet, and security group.
 - Explicit product-edition, centralized/distributed, and deployment-form selection without hard-coded regional flavors.
 - Live parameter metadata checks, value-range validation, and confirmation for sensitive or restart-requiring changes.
-- AK/SK, temporary security tokens, project discovery, and hot-reloaded mode-`0600` credential files.
+- Reuse of huaweicloud-devkit S1 credentials, AK/SK, temporary tokens, project discovery, and hot-reloaded mode-`0600` credential files.
 - Read-only mode, protected resources, policy-based confirmation, recursive masking, and JSONL auditing.
 
 See the [GaussDB server guide](server/mcp_server_gaussdb/README.md) for the complete tool and configuration reference.
 
 ## Quick start
+
+When `huaweicloud-devkit` is configured, the server automatically reads
+`~/.config/huaweicloud/credentials.json`, so the MCP client does not need another AK/SK copy.
+Environment variables and the MCP-managed credential file remain available without devkit.
 
 Run from source:
 
@@ -27,9 +31,6 @@ git clone https://github.com/jarrenL/huaweicloud-gaussdb-mcp.git
 cd huaweicloud-gaussdb-mcp
 uv sync --all-packages --all-groups
 
-export HUAWEICLOUD_ACCESS_KEY="<your-access-key>"
-export HUAWEICLOUD_SECRET_KEY="<your-secret-key>"
-export HUAWEICLOUD_REGION="cn-north-4"
 export HUAWEICLOUD_MCP_READ_ONLY="true"
 
 uv run mcp-server-huaweicloud-gaussdb
@@ -50,9 +51,6 @@ Generic stdio client configuration:
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4",
         "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
@@ -82,6 +80,7 @@ See the official [GaussDB permissions reference](https://support.huaweicloud.com
 |---|---|
 | `libs/huaweicloud_mcp_core` | Shared runtime, credentials, guardrails, masking, auditing, and output contracts |
 | `server/mcp_server_gaussdb` | GaussDB server, tools, service/client layers, and tests |
+| `skills/database/gaussdb/huawei-cloud-gaussdb-manage` | Agent Skill for safe GaussDB management through this MCP server |
 | `examples` | AgentArts, credential hot-reload, and guardrail examples |
 | `.github` | Continuous integration, issue templates, and pull request template |
 
@@ -102,6 +101,7 @@ The default test suite uses mocks and does not access cloud resources. Live test
 ## Documentation
 
 - [GaussDB MCP server guide](server/mcp_server_gaussdb/README.md)
+- [GaussDB management Skill](skills/database/gaussdb/huawei-cloud-gaussdb-manage/SKILL.md)
 - [OpenAPI live-validation notes (Chinese)](server/mcp_server_gaussdb/OPENAPI_VALIDATION_zh.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)

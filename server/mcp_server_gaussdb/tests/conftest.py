@@ -20,6 +20,8 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "HUAWEICLOUD_SECURITY_TOKEN",
         "HUAWEICLOUD_ENDPOINT",
         "HUAWEICLOUD_MCP_CREDENTIALS_FILE",
+        "HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE",
+        "HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS",
         "HUAWEICLOUD_MCP_READ_ONLY",
         "HUAWEICLOUD_MCP_PROTECTED_IDS",
         "HUAWEICLOUD_MCP_PROTECTED_NAMES",
@@ -30,6 +32,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "MCP_SERVER_PORT",
     ):
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS", "1")
 
 
 @pytest.fixture

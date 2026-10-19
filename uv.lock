@@ -655,7 +655,7 @@ wheels = [
 
 [[package]]
 name = "huaweicloud-mcp-core"
-version = "1.1.1"
+version = "1.2.0"
 source = { editable = "libs/huaweicloud_mcp_core" }
 dependencies = [
     { name = "huaweicloudsdkcore" },
@@ -958,7 +958,7 @@ wheels = [
 
 [[package]]
 name = "mcp-server-huaweicloud-gaussdb"
-version = "0.3.6"
+version = "0.3.7"
 source = { editable = "server/mcp_server_gaussdb" }
 dependencies = [
     { name = "huaweicloud-mcp-core" },

@@ -4,7 +4,7 @@
 
 面向华为云数据库管理场景的开源 MCP Server 工程。当前版本聚焦**云数据库 GaussDB**，不包含 DRS。它把实例、备份、规格、扩容、重启、参数、慢 SQL 和异步任务等管理能力封装为标准 MCP 工具，可接入 AgentArts、OfficeACE、码道 MCP 市场及其他兼容 MCP 的客户端。
 
-当前版本：`0.3.6`；Python `3.10+`；协议传输：stdio、Streamable HTTP；许可证：Apache-2.0。
+当前版本：`0.3.7`；Python `3.10+`；协议传输：stdio、Streamable HTTP；许可证：Apache-2.0。
 
 ## 主要能力
 
@@ -13,12 +13,16 @@
 - 实时发现区域、Project、版本、部署形态、规格、可用区、VPC、子网和安全组，不固化区域规格。
 - 区分基础版/企业版、集中式/分布式，以及单副本、1 主 2 备、1 主 1 备 1 日志等部署选项。
 - 参数修改前实时读取可修改参数及值域；只读、未知和高风险参数受到阻断或二次确认保护。
-- 支持 AK/SK、临时安全令牌、项目 ID 自动发现，以及 `0600` 凭证文件热加载。
+- 支持复用 huaweicloud-devkit S1 凭证、AK/SK、临时安全令牌、项目 ID 自动发现，以及 `0600` 凭证文件热加载。
 - 提供只读模式、保护资源名单、规则化确认、递归脱敏和 JSONL 审计。
 
 完整工具表、字段说明和安全行为见 [GaussDB 中文说明](server/mcp_server_gaussdb/README_zh.md)。
 
 ## 快速开始
+
+若已通过 `huaweicloud-devkit` 配置账号，服务会自动读取
+`~/.config/huaweicloud/credentials.json`，客户端无需再次保存 AK/SK。未使用 devkit 时，
+仍可通过环境变量或 MCP 自管凭证文件配置。
 
 ### 从源码运行
 
@@ -27,9 +31,6 @@ git clone https://github.com/jarrenL/huaweicloud-gaussdb-mcp.git
 cd huaweicloud-gaussdb-mcp
 uv sync --all-packages --all-groups
 
-export HUAWEICLOUD_ACCESS_KEY="<your-access-key>"
-export HUAWEICLOUD_SECRET_KEY="<your-secret-key>"
-export HUAWEICLOUD_REGION="cn-north-4"
 export HUAWEICLOUD_MCP_READ_ONLY="true"
 
 uv run mcp-server-huaweicloud-gaussdb
@@ -50,9 +51,6 @@ uvx mcp-server-huaweicloud-gaussdb
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4",
         "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
@@ -73,7 +71,7 @@ uv run mcp-server-huaweicloud-gaussdb -t streamable-http
 ## 安全使用
 
 1. 为 MCP 使用独立 IAM 用户或临时安全凭证，只授予实际要调用的 GaussDB/VPC/IAM 查询权限。
-2. 不要把 AK/SK 写入仓库、客户端共享配置或命令历史；生产环境使用凭证文件热加载或密钥管理系统注入。
+2. 优先复用 `~/.config/huaweicloud/credentials.json`，不要把 AK/SK 写入仓库、客户端共享配置或命令历史；生产环境使用临时凭证、凭证热加载或密钥管理系统注入。
 3. 首次接入保持 `HUAWEICLOUD_MCP_READ_ONLY=true`。
 4. 写操作启用 [安全规则示例](examples/guardrails.example.yaml) 和审计文件；删除、切换、恢复、升级等危险操作必须显式确认。
 
@@ -85,6 +83,7 @@ uv run mcp-server-huaweicloud-gaussdb -t streamable-http
 |---|---|
 | `libs/huaweicloud_mcp_core` | 公共运行时、凭证、安全护栏、脱敏、审计和统一输出 |
 | `server/mcp_server_gaussdb` | GaussDB MCP Server、工具实现、服务层、客户端层和测试 |
+| `skills/database/gaussdb/huawei-cloud-gaussdb-manage` | 通过本 MCP 安全管理 GaussDB 的 Agent Skill |
 | `examples` | AgentArts、凭证热加载和安全规则配置示例 |
 | `.github` | 持续集成、Issue 和 Pull Request 模板 |
 
@@ -105,6 +104,7 @@ uv build --package mcp-server-huaweicloud-gaussdb
 ## 文档
 
 - [GaussDB MCP 完整说明](server/mcp_server_gaussdb/README_zh.md)
+- [GaussDB 管理 Skill](skills/database/gaussdb/huawei-cloud-gaussdb-manage/SKILL.md)
 - [OpenAPI 云上验证说明](server/mcp_server_gaussdb/OPENAPI_VALIDATION_zh.md)
 - [贡献指南](CONTRIBUTING.md)
 - [安全策略](SECURITY.md)

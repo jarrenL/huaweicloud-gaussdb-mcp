@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.3.6`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.3.7`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -12,15 +12,17 @@
 
 ## 快速开始
 
-准备 Python 3.10+、`uv` 和具有 GaussDB 查询权限的华为云凭证。首次接入建议启用只读模式：
+准备 Python 3.10+、`uv` 和具有 GaussDB 查询权限的华为云凭证。若已经通过
+`huaweicloud-devkit` 配置凭证，MCP 会自动复用
+`~/.config/huaweicloud/credentials.json`。首次接入建议启用只读模式：
 
 ```bash
-export HUAWEICLOUD_ACCESS_KEY="<your-access-key>"
-export HUAWEICLOUD_SECRET_KEY="<your-secret-key>"
-export HUAWEICLOUD_REGION="cn-north-4"
 export HUAWEICLOUD_MCP_READ_ONLY="true"
 uvx mcp-server-huaweicloud-gaussdb
 ```
+
+未使用 devkit 时，仍可显式设置 `HUAWEICLOUD_ACCESS_KEY`、
+`HUAWEICLOUD_SECRET_KEY` 和 `HUAWEICLOUD_REGION`。
 
 通用 stdio 客户端配置：
 
@@ -31,9 +33,6 @@ uvx mcp-server-huaweicloud-gaussdb
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4",
         "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
@@ -54,7 +53,7 @@ uvx mcp-server-huaweicloud-gaussdb
 - 创建前显式选择产品类型、集中式/分布式和部署形态；默认推荐基础版单副本用于开发联调。
 - 手工备份、备份查询、自动备份策略查询与修改。
 - 参数查询和修改、慢 SQL 分析、异步任务查询。
-- AK/SK/临时安全令牌、项目 ID 自动发现、凭证文件热加载。
+- AK/SK/临时安全令牌、devkit S1 凭证复用、项目 ID 自动发现、凭证文件热加载。
 - 只读模式、规则化阻断/确认/告警、敏感信息脱敏和 JSONL 审计。
 - 统一分页、字段白名单、长字段截断和可供模型理解的错误结构。
 
@@ -87,7 +86,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.3.6` 基于 SDK `3.1.217` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.3.7` 基于 SDK `3.1.217` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
@@ -180,15 +179,17 @@ Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX �
 
 | 变量 | 必需 | 说明 |
 |---|---:|---|
-| `HUAWEICLOUD_ACCESS_KEY` | 是* | IAM Access Key |
-| `HUAWEICLOUD_SECRET_KEY` | 是* | IAM Secret Key |
-| `HUAWEICLOUD_REGION` | 是* | 区域，例如 `cn-north-4` |
+| `HUAWEICLOUD_ACCESS_KEY` | 是* | IAM Access Key；优先级最高 |
+| `HUAWEICLOUD_SECRET_KEY` | 是* | IAM Secret Key；优先级最高 |
+| `HUAWEICLOUD_REGION` | 是* | 区域，例如 `cn-north-4`；优先级最高 |
 | `HUAWEICLOUD_PROJECT_ID` | 否 | 项目 ID；缺省时通过 IAM 按区域发现 |
 | `HUAWEICLOUD_DOMAIN_ID` | 否 | 使用全局凭证时的账号 ID |
 | `HUAWEICLOUD_SECURITY_TOKEN` | 否 | 临时安全令牌 |
 | `HUAWEICLOUD_ENDPOINT` | 否 | 自定义 GaussDB Endpoint |
 | `HUAWEICLOUD_IAM_ENDPOINT` | 否 | 项目 ID 自动发现使用的 IAM Endpoint，默认 `https://iam.myhuaweicloud.com` |
-| `HUAWEICLOUD_MCP_CREDENTIALS_FILE` | 否 | 热加载凭证 JSON 路径，使用时替代上面的凭证变量 |
+| `HUAWEICLOUD_MCP_CREDENTIALS_FILE` | 否 | MCP 自管热加载凭证 JSON；权限必须为 `0600` |
+| `HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE` | 否 | devkit S1 路径；默认 `~/.config/huaweicloud/credentials.json` |
+| `HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS` | 否 | `1`/`true` 时关闭 devkit S1 自动复用 |
 | `HUAWEICLOUD_MCP_READ_ONLY` | 否 | `true` 时阻断全部 WRITE/DANGEROUS 工具 |
 | `HUAWEICLOUD_MCP_GUARDRAILS_CONFIG` | 否 | YAML 安全规则文件路径 |
 | `HUAWEICLOUD_MCP_PROTECTED_IDS` | 否 | 逗号分隔的保护资源 ID |
@@ -198,7 +199,26 @@ Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX �
 | `MCP_SERVER_HOST` | 否 | HTTP 监听地址，默认 `0.0.0.0` |
 | `MCP_SERVER_PORT` | 否 | HTTP 端口，默认 `8000` |
 
-`*` 使用凭证文件时，在文件中配置。
+`*` 可由显式环境变量、MCP 凭证文件或 devkit S1 提供。读取优先级按字段为：环境变量、
+MCP 凭证文件、devkit S1。`project_id` 和 `domain_id` 不从 devkit 读取；未显式设置
+`project_id` 时继续通过 IAM 按区域自动发现。
+
+### 复用 huaweicloud-devkit 凭证
+
+devkit 的 S1 文件使用 `ak`、`sk`、`securityToken`、`region` 字段。MCP 会分别映射为
+`access_key`、`secret_key`、`security_token`、`region`。该文件由 devkit 管理，因此读取时
+不强制 `0600`，但仍要求它是有效的普通 JSON 对象。每次工具调用都会重新读取，执行
+`auth_switch persist` 后无需在 MCP 客户端重复配置 AK/SK。
+
+在 opencode 等本地客户端中只需保留运行策略：
+
+```json
+{
+  "environment": {
+    "HUAWEICLOUD_MCP_READ_ONLY": "true"
+  }
+}
+```
 
 ### 凭证热加载
 
@@ -229,10 +249,7 @@ AgentArts 的 UVX 配置示例：
       "command": "uvx",
       "args": ["mcp-server-huaweicloud-gaussdb"],
       "env": {
-        "HUAWEICLOUD_ACCESS_KEY": "${HUAWEICLOUD_ACCESS_KEY}",
-        "HUAWEICLOUD_SECRET_KEY": "${HUAWEICLOUD_SECRET_KEY}",
-        "HUAWEICLOUD_REGION": "cn-north-4",
-        "HUAWEICLOUD_PROJECT_ID": "${HUAWEICLOUD_PROJECT_ID}"
+        "HUAWEICLOUD_MCP_READ_ONLY": "true"
       }
     }
   }

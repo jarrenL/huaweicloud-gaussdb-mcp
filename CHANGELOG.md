@@ -2,6 +2,23 @@
 
 All notable user-visible changes are recorded here. This project follows semantic versioning.
 
+## [0.3.7] - 2026-10-19
+
+### Added
+
+- Reused credentials managed by `huaweicloud-devkit` from
+  `~/.config/huaweicloud/credentials.json`, including temporary security tokens and region.
+- Added `HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE` for a custom devkit S1 path and
+  `HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS=1` to disable automatic reuse.
+
+### Changed
+
+- Credential values now resolve per field in this order: explicit environment variable, MCP
+  credential file, then the devkit S1 store. Project and domain IDs continue to use explicit
+  configuration or IAM discovery.
+- The MCP-owned credential file still requires mode `0600`; the devkit-owned S1 file accepts its
+  existing permissions while retaining regular-file and JSON-object validation.
+
 ## [0.3.6] - 2026-10-09
 
 ### Fixed
