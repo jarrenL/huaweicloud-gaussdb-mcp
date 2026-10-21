@@ -4,17 +4,18 @@
 
 面向华为云数据库管理场景的开源 MCP Server 工程。当前版本聚焦**云数据库 GaussDB**，不包含 DRS。它把实例、备份、规格、扩容、重启、参数、慢 SQL 和异步任务等管理能力封装为标准 MCP 工具，可接入 AgentArts、OfficeACE、码道 MCP 市场及其他兼容 MCP 的客户端。
 
-当前版本：`0.3.7`；Python `3.10+`；协议传输：stdio、Streamable HTTP；许可证：Apache-2.0。
+当前版本：`0.4.0`；Python `3.10+`；协议传输：stdio、Streamable HTTP；许可证：Apache-2.0。
 
 ## 主要能力
 
-- 17 个高频场景工具，覆盖实例创建/删除、规格变更、扩容、重启、备份、参数和慢 SQL。
+- 18 个高频场景工具，覆盖实例创建/删除、规格变更、扩容、重启、备份、参数、慢 SQL 和有界任务等待。
 - 5 个目录式 OpenAPI 工具，动态发现当前 SDK 的 265 个公开请求操作，并按 READ、WRITE、DANGEROUS 分流。
 - 实时发现区域、Project、版本、部署形态、规格、可用区、VPC、子网和安全组，不固化区域规格。
 - 区分基础版/企业版、集中式/分布式，以及单副本、1 主 2 备、1 主 1 备 1 日志等部署选项。
 - 参数修改前实时读取可修改参数及值域；只读、未知和高风险参数受到阻断或二次确认保护。
 - 支持复用 huaweicloud-devkit S1 凭证、AK/SK、临时安全令牌、项目 ID 自动发现，以及 `0600` 凭证文件热加载。
 - 提供只读模式、保护资源名单、规则化确认、递归脱敏和 JSONL 审计。
+- 明确 EIP 跨服务边界：GaussDB 负责绑定已有 EIP，新建 EIP 由华为云 VPC/EIP 服务完成。
 
 完整工具表、字段说明和安全行为见 [GaussDB 中文说明](server/mcp_server_gaussdb/README_zh.md)。
 

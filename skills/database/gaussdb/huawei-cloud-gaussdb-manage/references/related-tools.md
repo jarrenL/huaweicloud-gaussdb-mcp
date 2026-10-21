@@ -2,7 +2,7 @@
 
 ## 概述
 
-兼容的 MCP Server 当前至少暴露 17 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出
+兼容的 MCP Server 当前至少暴露 18 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出
 Agent 编排时最需要的部分；实际版本、工具数量和调用参数以 MCP 运行时返回为准。
 
 ## 实例与创建
@@ -38,8 +38,9 @@ Agent 编排时最需要的部分；实际版本、工具数量和调用参数�
 | `create_manual_backup` | `instance_id`, `name`, `description`, `confirm` | 名称 4-64 字符且字母开头；异步 |
 | `get_backup_policy` | `instance_id` | 修改前读取当前策略 |
 | `configure_backup_policy` | `instance_id`, `keep_days`, `start_time`, `period`, `differential_period`, `confirm` | `keep_days` 1-732；时间窗为 UTC；差量周期单位为分钟 |
-| `analyze_slow_sql` | `instance_id`, `node_ids`, `start_time`, `end_time`, `threshold`, `limit` | 时间是 Unix 毫秒；SQL 文本按敏感数据处理 |
+| `analyze_slow_sql` | `instance_id`, `node_ids`, `start_time`, `end_time`, `threshold`, `limit` | 时间是 Unix 毫秒或带时区 ISO 8601；SQL 文本按敏感数据处理 |
 | `get_job` | `job_id` | 跟踪创建、备份、变更、扩容、重启和参数任务 |
+| `wait_job` | `job_id`, `timeout_seconds`, `poll_interval_seconds` | 最多等待 1800 秒；本地超时后继续等待同一任务，不重复提交写操作 |
 
 ## OpenAPI 目录
 
@@ -88,8 +89,15 @@ Agent 编排时最需要的部分；实际版本、工具数量和调用参数�
 ```
 
 `component_id` 来自 `get_instance` 返回的 `nodes[].components[]`，例如 `dn_6002`。调用
-`invoke_dangerous_openapi` 后，用 `get_job` 跟踪返回的任务，再用 `get_instance` 验证角色。
+`invoke_dangerous_openapi` 后，用 `wait_job` 跟踪返回的任务。成功后若实例进入 `BACKING UP`，
+继续查询到 `ACTIVE`，再用 `get_instance` 验证角色。
 单副本不支持该操作；同一分片一次只能选择一个新的主节点。
+
+### EIP 分配与绑定
+
+`list_binded_eips` 和 `attach_eip` 属于 GaussDB OpenAPI；后者只接受已存在的公网地址和
+`public_ip_id`。无可用 EIP 时，先通过华为云 VPC/EIP `CreatePublicip`（例如
+`hcloud EIP CreatePublicip`）创建，再调用 `attach_eip`，最后用 `list_binded_eips` 验证。
 
 ## 跨服务工具
 

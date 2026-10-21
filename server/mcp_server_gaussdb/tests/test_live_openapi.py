@@ -1,6 +1,5 @@
 """Opt-in Huawei Cloud contract tests; the billed test always deletes its temporary instance."""
 
-import asyncio
 import os
 import secrets
 import string
@@ -24,18 +23,14 @@ pytestmark = [
 
 
 async def _wait_job(service: GaussDBService, job_id: str, timeout: int = 1500) -> dict[str, Any]:
-    for _ in range(max(1, timeout // 10)):
-        job = await service.get_job(job_id=job_id)
-        if str(job.get("status") or "").upper() in {
-            "COMPLETED",
-            "SUCCESS",
-            "SUCCEEDED",
-            "FAILED",
-            "ERROR",
-        }:
-            return job
-        await asyncio.sleep(10)
-    raise TimeoutError(f"job {job_id} did not finish within {timeout} seconds")
+    job = await service.wait_job(
+        job_id=job_id,
+        timeout_seconds=min(timeout, 1800),
+        poll_interval_seconds=10,
+    )
+    if job["timed_out"]:
+        raise TimeoutError(f"job {job_id} did not finish within {timeout} seconds")
+    return job
 
 
 @pytest.mark.parametrize(

@@ -29,6 +29,7 @@ EXPECTED = {
     "configure_backup_policy": ToolRisk.WRITE,
     "analyze_slow_sql": ToolRisk.READ,
     "get_job": ToolRisk.READ,
+    "wait_job": ToolRisk.READ,
     "list_openapi_operations": ToolRisk.READ,
     "describe_openapi_operation": ToolRisk.READ,
     "invoke_read_openapi": ToolRisk.READ,
@@ -39,7 +40,7 @@ EXPECTED = {
 
 async def test_tools_registered_and_guarded() -> None:
     tools = await mcp.list_tools()
-    assert mcp.version == "0.3.7"
+    assert mcp.version == "0.4.0"
     assert {tool.name for tool in tools} == set(EXPECTED)
     assert {name: get_tool_risk(name) for name in EXPECTED} == EXPECTED
     assert all(
@@ -84,6 +85,7 @@ async def test_all_tools_pass_arguments(monkeypatch) -> None:  # type: ignore[no
     await backup.configure_backup_policy("i", 7, "21:00-22:00", "1")
     await observability.analyze_slow_sql("i", ["n"], 1, 2)
     await observability.get_job("j")
+    await observability.wait_job("j", timeout_seconds=30, poll_interval_seconds=2)
     await openapi.list_openapi_operations()
     await openapi.describe_openapi_operation("show_deployment_form")
     await openapi.invoke_read_openapi("show_deployment_form", {})

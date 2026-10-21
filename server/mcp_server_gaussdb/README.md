@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.3.7`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.4.0`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -52,7 +52,8 @@ Database / cloud resource management / operations automation.
 - Discover project/domain context, engine versions, flavors, AZs, VPCs, subnets, and security groups.
 - Select product type and a live-verified deployment form explicitly; discovery defaults to a basic single replica for development validation.
 - Create and inspect backups and manage automatic backup policies.
-- Inspect and update parameters, analyze slow SQL, and track asynchronous jobs.
+- Inspect and update parameters, analyze slow SQL with epoch-millisecond or timezone-aware ISO
+  8601 windows, and wait for asynchronous jobs with a bounded timeout.
 - Reuse devkit S1 credentials or hot-reload AK/SK and temporary tokens from an MCP credential file.
 - Read-only mode, block/confirm/warn rules, recursive masking, and JSONL audit output.
 
@@ -69,7 +70,8 @@ Database / cloud resource management / operations automation.
 | `get_instance_parameters`, `update_instance_parameters` | Inspect and update parameters | READ / WRITE |
 | `list_backups`, `get_backup_policy` | Inspect backups and policy | READ |
 | `create_manual_backup`, `configure_backup_policy` | Create a backup or update policy | WRITE |
-| `analyze_slow_sql`, `get_job` | Analyze performance and track jobs | READ |
+| `analyze_slow_sql` | Analyze performance using epoch-millisecond or timezone-aware ISO 8601 windows | READ |
+| `get_job`, `wait_job` | Inspect one job state or poll to a terminal state with a bounded timeout | READ |
 | `list_openapi_operations`, `describe_openapi_operation` | Discover all public SDK operations and request shapes | READ |
 | `invoke_read_openapi` | Invoke catalog-classified read operations | READ |
 | `invoke_write_openapi` | Invoke catalog-classified additive or reversible operations | WRITE |
@@ -77,9 +79,17 @@ Database / cloud resource management / operations automation.
 
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.3.7` discovers 265 request operations from SDK `3.1.217`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.4.0` discovers 265 request operations from SDK `3.1.217`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
+
+`attach_eip` only binds or unbinds an existing public IP. Use Huawei Cloud VPC/EIP
+`CreatePublicip` (for example, `hcloud EIP CreatePublicip`) when allocation is needed, then pass
+the returned address and public-IP ID to `attach_eip` and verify with `list_binded_eips`.
+
+Use `wait_job` for long operations instead of repeated model-driven polling. A completed
+`SWITCHDN` job can temporarily move the instance to `BACKING UP` while GaussDB creates an
+automatic backup. Poll `get_instance` until the instance is `ACTIVE` before another write.
 
 ### Creation choices
 

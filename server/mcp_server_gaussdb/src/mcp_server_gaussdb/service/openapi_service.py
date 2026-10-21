@@ -25,6 +25,22 @@ _REQUEST_SHAPE_GUIDANCE: dict[str, dict[str, Any]] = {
         ),
         "request_example": {"instance_id": "<instance-id>", "key": "environment"},
     },
+    "attach_eip": {
+        "prerequisite_note": (
+            "This GaussDB operation only binds or unbinds an existing EIP. If no EIP is "
+            "available, create one through the Huawei Cloud VPC/EIP service first "
+            "(CreatePublicip; for example, hcloud EIP CreatePublicip)."
+        ),
+        "request_example": {
+            "instance_id": "<instance-id>",
+            "node_id": "<node-id>",
+            "body": {
+                "action": "BIND",
+                "public_ip": "<public-ip-address>",
+                "public_ip_id": "<public-ip-id>",
+            },
+        },
+    },
 }
 
 
@@ -163,11 +179,16 @@ class OpenApiService:
                     "documented request fields inside request."
                 ),
             ) from exc
-        hints = (
-            ["Cloud writes can be asynchronous; inspect returned job_id or task_id."]
-            if required_risk is not ToolRisk.READ
-            else None
-        )
+        hints: list[str] = []
+        if required_risk is not ToolRisk.READ:
+            hints.append("Cloud writes can be asynchronous; inspect returned job_id or task_id.")
+        if operation == "attach_eip":
+            hints.append(
+                "GaussDB only binds or unbinds an existing EIP. Create an EIP through the "
+                "Huawei Cloud VPC/EIP service first when needed, then verify the binding with "
+                "list_binded_eips."
+            )
         return single_result(
-            {"operation": operation, "risk": metadata.risk.value, "result": response}, hints
+            {"operation": operation, "risk": metadata.risk.value, "result": response},
+            hints,
         )

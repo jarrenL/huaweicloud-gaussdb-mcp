@@ -4,7 +4,7 @@ description: |
   通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB（openGauss）控制面，完成购买前选型与询价编排、实例生命周期、备份、参数、慢 SQL 和 DN 主备切换。适用于明确要求使用 MCP 管理华为云 GaussDB 的场景。NOT for: GaussDB(for MySQL)、直接 hcloud/KooCLI 运维、Terraform 建库、库内 SQL/DDL 或通用验收手册；这些场景分别路由到 huawei-gaussdb（或 huawei-cloud-gaussdb-instance-management）、对应 IaC Skill、huaweicloud-gaussdb-data 或专门验收 Skill。
 metadata:
   tags: [huawei-cloud, gaussdb, database, mcp, operations]
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # 华为云 GaussDB 管理
@@ -57,7 +57,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.3.7`。以运行时
+1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.4.0`。以运行时
    `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
@@ -83,8 +83,8 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 4. 对写操作展示目标资源、最终参数、影响、是否中断连接、是否产生费用和回滚方式。用户当前
    指令未明确授权这组具体参数时，在实际写调用前取得确认。
 5. 调用专用场景工具。只有没有专用工具时，才执行 OpenAPI 目录流程。
-6. 响应包含 `job_id` 时调用 `get_job` 跟踪到成功、失败或明确的非终态；不要把“请求已受理”
-   当作任务完成。
+6. 响应包含 `job_id` 时优先调用 `wait_job`，在有界超时内跟踪到成功、失败或明确的非终态；
+   超时后使用同一 `job_id` 继续等待，不要重复提交写操作，也不要把“请求已受理”当作任务完成。
 7. 用对应只读工具复查云端状态，并输出结构化结果、未决风险和任务 ID。
 
 ### 创建实例
@@ -142,8 +142,10 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
    `{"instance_id":"...","body":{"shards":[{"node_id":"...","component_id":"dn_..."}]}}`。
 4. 展示目标实例、分片、当前主节点、待升主节点、连接中断影响和验证方案。取得对这组精确组件
    的显式确认后，调用 `invoke_dangerous_openapi(operation="switch_shard", request=..., confirm=true)`。
-5. 返回 `job_id` 后调用 `get_job` 跟踪到终态；任务名通常为 `SWITCHDN`，但以云端响应为准。
-6. 再次调用 `get_instance`，确认目标组件已成为 Primary、原主节点变为 Standby，并核对
+5. 返回 `job_id` 后调用 `wait_job` 跟踪到终态；任务名通常为 `SWITCHDN`，但以云端响应为准。
+6. 任务成功后，实例可能因自动备份进入 `BACKING UP`。继续用 `get_instance` 等到 `ACTIVE`，
+   在此之前不提交下一项写操作。
+7. 再次调用 `get_instance`，确认目标组件已成为 Primary、原主节点变为 Standby，并核对
    `distributed_id` 的分片映射。不要假设该字段一定变化或一定保持不变。
 
 切换属于 `DANGEROUS`，期间连接可能中断。失败后先读取任务和实例状态，不自动重试切换。
@@ -164,6 +166,15 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
    `invoke_dangerous_openapi`。
 4. `direct_invoke_supported=false` 时改用指定的专用工具，不得绕过场景工具的校验。
 
+### EIP 创建与绑定
+
+1. 用 `list_openapi_operations(query="eip")` 和 `describe_openapi_operation` 发现
+   `list_binded_eips`、`attach_eip` 的实时请求结构。
+2. `attach_eip` 只绑定或解绑已有 EIP。没有可用 EIP 时，路由到华为云 VPC/EIP 服务的
+   `CreatePublicip`（例如 `hcloud EIP CreatePublicip`）创建；不得把 EIP 创建请求发给 GaussDB。
+3. 将新建接口返回的公网地址和公网 IP ID 连同实例、节点传给 `attach_eip`。绑定属于危险操作，
+   核对精确资源并取得确认后调用，再用 `list_binded_eips` 验证。
+
 ## 核心命令（MCP 工具）
 
 优先使用以下专用工具：
@@ -178,8 +189,8 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 | 参数管理 | `get_instance_parameters`, `update_instance_parameters` | READ/WRITE |
 | 备份 | `list_backups`, `create_manual_backup` | READ/WRITE |
 | 备份策略 | `get_backup_policy`, `configure_backup_policy` | READ/WRITE |
-| 慢 SQL | `analyze_slow_sql` | READ/敏感数据 |
-| 异步任务 | `get_job` | READ |
+| 慢 SQL | `analyze_slow_sql`（毫秒时间戳或带时区 ISO 8601） | READ/敏感数据 |
+| 异步任务 | `get_job`, `wait_job` | READ |
 | DN 主备切换 | `describe_openapi_operation` → `invoke_dangerous_openapi`（`switch_shard`） | DANGEROUS |
 | 删除实例 | `delete_instance` | DANGEROUS |
 

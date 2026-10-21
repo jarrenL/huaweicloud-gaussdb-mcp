@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from huaweicloud_mcp_core import McpToolError, ProjectContext
 
+from mcp_server_gaussdb.service import gaussdb_service as service_module
 from mcp_server_gaussdb.service.gaussdb_service import (
     GaussDBService,
     _parameter_risk_reasons,
@@ -477,6 +478,71 @@ async def test_resize_restart_and_jobs(service, fake_client) -> None:  # type: i
     assert (await service.restart_instance(instance_id="i"))["instance_id"] == "i"
     fake_client.responses["show_job_detail"] = {"job": {"id": "jj", "status": "RUNNING", "x": 1}}
     assert await service.get_job(job_id="jj") == {"id": "jj", "status": "RUNNING"}
+    fake_client.responses["show_job_detail"] = {
+        "job": {"id": "jj", "name": "SWITCHDN", "status": "COMPLETED"}
+    }
+    switched = await service.get_job(job_id="jj")
+    assert "BACKING UP" in switched["hints"][0]
+
+
+async def test_job_waiting_and_switchover_hint(
+    service, fake_client, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    clock = [0.0]
+    states = iter(
+        [
+            {"job": {"id": "j", "name": "SWITCHDN", "status": "RUNNING"}},
+            {"job": {"id": "j", "name": "SWITCHDN", "status": "COMPLETED"}},
+        ]
+    )
+
+    async def show_job_detail(*, job_id: str) -> dict[str, Any]:
+        assert job_id == "j"
+        return next(states)
+
+    async def advance(seconds: float) -> None:
+        clock[0] += seconds
+
+    fake_client.show_job_detail = show_job_detail
+    monkeypatch.setattr(service_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service_module.asyncio, "sleep", advance)
+    result = await service.wait_job(job_id="j", timeout_seconds=10, poll_interval_seconds=2)
+    assert result["terminal"] is True
+    assert result["successful"] is True
+    assert result["timed_out"] is False
+    assert result["poll_attempts"] == 2
+    assert result["elapsed_seconds"] == 2
+    assert "BACKING UP" in result["hints"][0]
+
+
+async def test_job_wait_timeout_and_validation(
+    service, fake_client, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    clock = [0.0]
+
+    async def advance(seconds: float) -> None:
+        clock[0] += seconds
+
+    fake_client.responses["show_job_detail"] = {"job": {"id": "j", "status": "RUNNING"}}
+    monkeypatch.setattr(service_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service_module.asyncio, "sleep", advance)
+    result = await service.wait_job(job_id="j", timeout_seconds=2, poll_interval_seconds=1)
+    assert result["terminal"] is False
+    assert result["timed_out"] is True
+    assert result["poll_attempts"] == 3
+    assert "do not resubmit" in result["hints"][0]
+    with pytest.raises(McpToolError, match="timeout_seconds"):
+        await service.wait_job(job_id="j", timeout_seconds=0)
+    with pytest.raises(McpToolError, match="poll_interval_seconds"):
+        await service.wait_job(job_id="j", poll_interval_seconds=61)
+
+    fake_client.responses["show_job_detail"] = {
+        "job": {"id": "j", "status": "FAILED", "fail_reason": "cloud rejected operation"}
+    }
+    failed = await service.wait_job(job_id="j")
+    assert failed["terminal"] is True
+    assert failed["successful"] is False
+    assert failed["fail_reason"] == "cloud rejected operation"
 
 
 async def test_expand_all_modes_and_invalid(service, fake_client) -> None:  # type: ignore[no-untyped-def]
@@ -652,6 +718,27 @@ async def test_analyze_slow_sql_validation_and_sort(service, fake_client) -> Non
     )
     assert result["items"][0]["sql_id"] == "s2"
     assert result["analysis"]["highest_avg_exec_time"] == "9.5"
+    assert result["analysis"]["query_window"] == {"start_time_ms": 1, "end_time_ms": 2}
+
+    await service.analyze_slow_sql(
+        instance_id="i",
+        node_ids=["n"],
+        start_time="2026-10-21T15:30:00+08:00",
+        end_time="2026-10-21T08:30:00Z",
+    )
+    call = fake_client.calls[-1][1]
+    assert call["end_time"] - call["start_time"] == 3_600_000
+    await service.analyze_slow_sql(
+        instance_id="i", node_ids=["n"], start_time="1", end_time="2"
+    )
+    assert fake_client.calls[-1][1]["start_time"] == 1
+    with pytest.raises(McpToolError, match="ISO 8601"):
+        await service.analyze_slow_sql(
+            instance_id="i",
+            node_ids=["n"],
+            start_time="2026-10-21T15:30:00",
+            end_time="2026-10-21T16:30:00+08:00",
+        )
 
 
 async def test_backup_policy(service, fake_client) -> None:  # type: ignore[no-untyped-def]

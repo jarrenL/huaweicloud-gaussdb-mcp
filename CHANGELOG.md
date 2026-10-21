@@ -4,10 +4,26 @@ All notable user-visible changes are recorded here. This project follows semanti
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+### Added
+
+- Added `wait_job`, which polls an asynchronous GaussDB job to a terminal state with bounded
+  timeout and interval controls, poll metadata, and safe resume guidance after a local timeout.
+
 ### Changed
 
-- Updated the GaussDB management Skill to `1.1.0` with explicit routing against overlapping
-  KooCLI/data-plane skills, a BSS-backed purchase-estimation workflow, and DN switchover guidance.
+- `analyze_slow_sql` now accepts Unix epoch milliseconds, numeric millisecond strings, and
+  timezone-aware ISO 8601 values, and returns the normalized query window.
+- OpenAPI discovery and invocation now explain that `attach_eip` binds an existing EIP and that
+  allocation belongs to Huawei Cloud VPC/EIP `CreatePublicip`.
+- `get_job` and `wait_job` warn that a completed `SWITCHDN` task can leave the instance in the
+  automatic-backup window and that callers must wait for instance status `ACTIVE` before another
+  write.
+- Updated the GaussDB management Skill to `1.2.0` with EIP routing, bounded job waiting,
+  switchover stabilization, and ISO 8601 slow-SQL guidance.
+- Added explicit routing against overlapping KooCLI/data-plane skills, a BSS-backed
+  purchase-estimation workflow, and DN switchover guidance to the GaussDB management Skill.
 - Added a safe stdio smoke script that verifies MCP initialization, core tool discovery,
   credential-backed instance listing, and read-only write blocking without printing resource data.
 

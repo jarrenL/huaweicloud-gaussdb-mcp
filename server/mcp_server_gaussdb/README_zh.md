@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.3.7`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.4.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -52,7 +52,7 @@ uvx mcp-server-huaweicloud-gaussdb
 - 自动发现 Project/Domain、引擎版本、规格、可用区、VPC、子网和安全组。
 - 创建前显式选择产品类型、集中式/分布式和部署形态；默认推荐基础版单副本用于开发联调。
 - 手工备份、备份查询、自动备份策略查询与修改。
-- 参数查询和修改、慢 SQL 分析、异步任务查询。
+- 参数查询和修改、支持毫秒时间戳或带时区 ISO 8601 的慢 SQL 分析，以及有界异步任务等待。
 - AK/SK/临时安全令牌、devkit S1 凭证复用、项目 ID 自动发现、凭证文件热加载。
 - 只读模式、规则化阻断/确认/告警、敏感信息脱敏和 JSONL 审计。
 - 统一分页、字段白名单、长字段截断和可供模型理解的错误结构。
@@ -76,8 +76,8 @@ uvx mcp-server-huaweicloud-gaussdb
 | `create_manual_backup` | 创建手工备份 | WRITE |
 | `get_backup_policy` | 查询自动备份策略 | READ |
 | `configure_backup_policy` | 修改自动备份策略 | WRITE |
-| `analyze_slow_sql` | 按平均执行时间分析慢 SQL | READ |
-| `get_job` | 跟踪创建、备份、变更、扩容等异步任务 | READ |
+| `analyze_slow_sql` | 按平均执行时间分析慢 SQL，时间支持毫秒时间戳或带时区 ISO 8601 | READ |
+| `get_job`, `wait_job` | 单次查询任务，或在超时范围内轮询到终态 | READ |
 | `list_openapi_operations` | 分页检索当前 SDK 的全部公开 GaussDB OpenAPI | READ |
 | `describe_openapi_operation` | 查询指定接口的完整嵌套请求结构 | READ |
 | `invoke_read_openapi` | 调用目录中归类为只读的接口 | READ |
@@ -86,13 +86,21 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.3.7` 基于 SDK `3.1.217` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.4.0` 基于 SDK `3.1.217` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
 3. 按目录给出的风险等级调用对应的 `invoke_*_openapi` 工具；风险通道不匹配时服务会拒绝调用。
 
 `DANGEROUS` 通道始终要求 `confirm=true`。请求包含 `instance_id` 时，服务还会重新读取云端实例并校验保护 ID、名称和标签。SDK 升级后新增接口会自动进入目录，但发布前仍需复核其风险分类和云端约束。
+
+`attach_eip` 只负责绑定或解绑已有公网 IP。如果没有可用 EIP，先通过华为云 VPC/EIP 的
+`CreatePublicip`（例如 `hcloud EIP CreatePublicip`）创建，再把公网地址和公网 IP ID 传给
+`attach_eip`，最后用 `list_binded_eips` 验证。
+
+长任务优先调用 `wait_job`，避免 Agent 多轮发起 `get_job`。`SWITCHDN` 任务成功后，实例可能
+因自动备份短暂处于 `BACKING UP`；开始下一项写操作前，应持续调用 `get_instance` 直到状态为
+`ACTIVE`。
 
 ### 创建选型
 

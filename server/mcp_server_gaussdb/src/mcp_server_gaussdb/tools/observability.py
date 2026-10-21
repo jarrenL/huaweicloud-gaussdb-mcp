@@ -13,8 +13,8 @@ from ..service.gaussdb_service import GaussDBService
 async def analyze_slow_sql(
     instance_id: str,
     node_ids: list[str],
-    start_time: int,
-    end_time: int,
+    start_time: int | str,
+    end_time: int | str,
     threshold: int = 1,
     limit: int = 20,
 ) -> dict[str, Any]:
@@ -26,10 +26,9 @@ async def analyze_slow_sql(
     Args:
         instance_id: Target GaussDB instance ID.
         node_ids: One to 100 node IDs from get_instance.node_ids.
-        start_time: Query start as an integer Unix timestamp in milliseconds, for example
-            1760000000000. ISO date strings are not accepted.
-        end_time: Query end as an integer Unix timestamp in milliseconds, later than start_time.
-            ISO date strings are not accepted.
+        start_time: Query start as Unix epoch milliseconds or timezone-aware ISO 8601, for example
+            1761046200000, 2026-10-21T15:30:00+08:00, or 2026-10-21T07:30:00Z.
+        end_time: Query end in the same formats, later than start_time.
         threshold: Slow SQL threshold in seconds, from 1 to 99; default 1.
         limit: Maximum ranked records, clamped to 1-100; default 20.
 
@@ -60,3 +59,30 @@ async def get_job(job_id: str) -> dict[str, Any]:
         Job status, progress, timestamps, instance reference and failure reason.
     """
     return await GaussDBService().get_job(job_id=job_id)
+
+
+@mcp.tool()
+@guard(risk=ToolRisk.READ)
+async def wait_job(
+    job_id: str,
+    timeout_seconds: int = 300,
+    poll_interval_seconds: int = 10,
+) -> dict[str, Any]:
+    """Wait for a GaussDB management job to reach a terminal status.
+
+    Scenario: track a long-running create, backup, resize, expansion, restart, parameter, or
+    switchover job without requiring the Agent to issue many individual get_job calls.
+
+    Args:
+        job_id: Job ID returned by a GaussDB write tool.
+        timeout_seconds: Maximum local wait, from 1 to 1800 seconds; default 300.
+        poll_interval_seconds: Poll interval, from 1 to 60 seconds; default 10.
+
+    Returns:
+        Latest job state, terminal/success flags, timeout flag, poll count and elapsed time.
+    """
+    return await GaussDBService().wait_job(
+        job_id=job_id,
+        timeout_seconds=timeout_seconds,
+        poll_interval_seconds=poll_interval_seconds,
+    )

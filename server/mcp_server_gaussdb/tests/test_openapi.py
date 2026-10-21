@@ -93,6 +93,9 @@ async def test_catalog_service_filters_pages_and_describes() -> None:
         "key": "environment",
     }
     assert "no body" in tag_delete["request_shape_note"]
+    attach_eip = await service.describe_operation(operation="attach_eip")
+    assert "VPC/EIP" in attach_eip["prerequisite_note"]
+    assert attach_eip["request_example"]["body"]["action"] == "BIND"
     with pytest.raises(McpToolError, match="risk"):
         await service.list_operations(risk="INVALID")
     with pytest.raises(McpToolError, match="not found"):
@@ -124,6 +127,18 @@ async def test_openapi_service_enforces_risk_lane() -> None:
         "list_database_instances",
         "delete_instance",
     ]
+
+    result = await service.invoke(
+        operation="attach_eip",
+        request={
+            "instance_id": "i",
+            "node_id": "n",
+            "body": {"action": "BIND", "public_ip": "192.0.2.1", "public_ip_id": "eip"},
+        },
+        required_risk=ToolRisk.DANGEROUS,
+    )
+    assert any("VPC/EIP" in hint for hint in result["hints"])
+    assert any("list_binded_eips" in hint for hint in result["hints"])
 
     with pytest.raises(McpToolError) as excinfo:
         await service.invoke(

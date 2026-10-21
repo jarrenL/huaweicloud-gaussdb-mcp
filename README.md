@@ -4,17 +4,20 @@
 
 Open-source MCP servers for Huawei Cloud database management. The current release focuses on **GaussDB** and excludes DRS. It exposes instance, backup, resize, expansion, restart, parameter, slow-SQL, and asynchronous-job management through standard MCP tools for AgentArts, OfficeACE, CodeArts MCP Marketplace, and other MCP-compatible clients.
 
-Current version: `0.3.7`; Python `3.10+`; transports: stdio and Streamable HTTP; license: Apache-2.0.
+Current version: `0.4.0`; Python `3.10+`; transports: stdio and Streamable HTTP; license: Apache-2.0.
 
 ## Highlights
 
-- 17 task-oriented tools for common GaussDB lifecycle and operations workflows.
+- 18 task-oriented tools for common GaussDB lifecycle and operations workflows, including bounded
+  asynchronous-job waiting and ISO 8601 slow-SQL windows.
 - 5 catalog tools that dynamically expose 265 public SDK request operations through READ, WRITE, and DANGEROUS lanes.
 - Live discovery of project, region, engine version, deployment form, flavor, AZ, VPC, subnet, and security group.
 - Explicit product-edition, centralized/distributed, and deployment-form selection without hard-coded regional flavors.
 - Live parameter metadata checks, value-range validation, and confirmation for sensitive or restart-requiring changes.
 - Reuse of huaweicloud-devkit S1 credentials, AK/SK, temporary tokens, project discovery, and hot-reloaded mode-`0600` credential files.
 - Read-only mode, protected resources, policy-based confirmation, recursive masking, and JSONL auditing.
+- Clear EIP service boundaries: GaussDB binds existing EIPs, while allocation is performed through
+  Huawei Cloud VPC/EIP.
 
 See the [GaussDB server guide](server/mcp_server_gaussdb/README.md) for the complete tool and configuration reference.
 

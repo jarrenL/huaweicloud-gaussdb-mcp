@@ -32,6 +32,7 @@ MINIMUM_TOOLS = {
     "discover_create_options",
     "get_instance_parameters",
     "get_job",
+    "wait_job",
     "list_openapi_operations",
     "describe_openapi_operation",
     "invoke_dangerous_openapi",

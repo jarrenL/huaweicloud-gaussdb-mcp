@@ -958,7 +958,7 @@ wheels = [
 
 [[package]]
 name = "mcp-server-huaweicloud-gaussdb"
-version = "0.3.7"
+version = "0.4.0"
 source = { editable = "server/mcp_server_gaussdb" }
 dependencies = [
     { name = "huaweicloud-mcp-core" },

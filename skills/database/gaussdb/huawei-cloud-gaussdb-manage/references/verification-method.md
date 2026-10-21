@@ -58,7 +58,7 @@ uv sync --all-packages
 uv run mcp-server-huaweicloud-gaussdb
 ```
 
-通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 22 个
+通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 23 个
 工具，包含 `discover_create_options`、`update_instance_parameters`、
 `describe_openapi_operation` 和 `invoke_dangerous_openapi`。新增兼容工具不应导致验证失败。
 
@@ -102,7 +102,7 @@ uv run mcp-server-huaweicloud-gaussdb
 只有用户明确授权、使用专用测试项目并接受费用时执行：
 
 1. 用实时发现结果创建按需测试实例。
-2. 轮询 `get_job` 并用 `get_instance` 验证可用。
+2. 用 `wait_job` 轮询到终态，并用 `get_instance` 验证可用。
 3. 创建手工备份，修改一个可恢复的低风险参数，再恢复原值。
 4. 验证规格/容量或备份策略写操作时，记录前后值和任务 ID。
 5. 用户明确授权清理后删除测试实例，轮询到完成，并用 `list_instances` 确认不存在。
