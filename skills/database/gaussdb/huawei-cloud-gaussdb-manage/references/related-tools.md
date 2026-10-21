@@ -2,8 +2,8 @@
 
 ## 概述
 
-MCP Server 0.3.7 暴露 17 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出 Agent
-编排时最需要的部分；实际调用以 MCP 返回的输入 Schema 为准。
+兼容的 MCP Server 当前至少暴露 17 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出
+Agent 编排时最需要的部分；实际版本、工具数量和调用参数以 MCP 运行时返回为准。
 
 ## 实例与创建
 
@@ -63,6 +63,45 @@ MCP Server 0.3.7 暴露 17 个场景工具和 5 个 OpenAPI 目录/调用工具�
 ```
 
 必须先 describe，再 invoke。风险通道不匹配、专用工具限制或缺少危险确认时，服务会拒绝调用。
+
+### DN 分片主备切换
+
+`switch_shard` 位于动态 OpenAPI 目录并分类为 `DANGEROUS`。先用 `get_instance` 获取组件，
+选择将要升主的 Standby DN，再查询运行时 Schema：
+
+```json
+{
+  "operation": "switch_shard",
+  "request": {
+    "instance_id": "<instance-id>",
+    "body": {
+      "shards": [
+        {
+          "node_id": "<standby-node-id>",
+          "component_id": "<standby-component-id>"
+        }
+      ]
+    }
+  },
+  "confirm": true
+}
+```
+
+`component_id` 来自 `get_instance` 返回的 `nodes[].components[]`，例如 `dn_6002`。调用
+`invoke_dangerous_openapi` 后，用 `get_job` 跟踪返回的任务，再用 `get_instance` 验证角色。
+单副本不支持该操作；同一分片一次只能选择一个新的主节点。
+
+## 跨服务工具
+
+购买前报价不是 GaussDB OpenAPI。通过独立的 BSS/计费连接器调用：
+
+| 任务 | BSS 操作 | 约束 |
+|---|---|---|
+| 按需询价 | `ListOnDemandResourceRatings` | 商品编码和度量单位来自 BSS 目录 |
+| 包年/包月询价 | `ListRateOnPeriodDetail` | 按真实购买期限查询 |
+| 账户余额 | `ShowCustomerAccountBalances` | 客户自身凭证及 `billing:balance:view` |
+
+没有 BSS 连接器或权限时停止自动报价，不通过 `invoke_read_openapi` 调用跨服务 API。
 
 ## 常见错误
 

@@ -27,6 +27,7 @@ GaussDB 是区域级服务。应在目标区域项目中授权，并按实际启
 | 创建实例 | `gaussdb:instance:create`, `gaussdb:param:list` | 包周期、KMS 加密另有 BSS/KMS 依赖 |
 | 规格变更/节点或磁盘扩容 | `gaussdb:instance:modifySpec` | 可能产生订单或中断 |
 | 重启实例 | `gaussdb:instance:restart` | 中断连接 |
+| DN 分片主备切换 | `gaussdb:instance:switchShard` | DANGEROUS；切换期间连接可能中断 |
 | 删除实例 | `gaussdb:instance:delete` | 包周期退订另需 BSS 权限 |
 | 查询/修改参数 | `gaussdb:param:list`, `gaussdb:param:modify` | 修改前必须实时查询可修改元数据 |
 | 创建/查询备份 | `gaussdb:backup:create`, `gaussdb:backup:list` | 手工备份创建是写操作 |
@@ -45,6 +46,10 @@ GaussDB 是区域级服务。应在目标区域项目中授权，并按实际启
 
 包周期创建通常还需要 `bss:order:update`、`bss:order:view` 和 `bss:balance:view`；KMS 加密实例
 通常需要 `kms:cmk:get`、`kms:cmk:list`。只有请求实际使用这些能力时才授权。
+
+购买前查询账户余额的身份策略授权项是 `billing:balance:view`。BSS 商品询价与客户/伙伴账号
+体系相关，使用前按调用主体核对对应 API 的授权要求；不要因为询价失败而给 GaussDB MCP
+授予全局管理员权限。
 
 ## 最小权限策略示例
 

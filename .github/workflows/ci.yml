@@ -19,6 +19,13 @@ jobs:
       - run: uv sync --frozen --all-packages --all-groups
       - run: uv run --package huaweicloud-mcp-core ruff check libs/huaweicloud_mcp_core/src libs/huaweicloud_mcp_core/tests
       - run: uv run --package mcp-server-huaweicloud-gaussdb ruff check server/mcp_server_gaussdb/src server/mcp_server_gaussdb/tests
+      - run: uv run ruff check skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts
+      - run: python3 skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts/validate-skill.py
+      - name: Smoke-test MCP registration and read-only guardrails
+        run: >-
+          uv run python
+          skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts/smoke.py
+          --skip-cloud -- uv run --directory "$PWD" mcp-server-huaweicloud-gaussdb
       - run: cd libs/huaweicloud_mcp_core && uv run --package huaweicloud-mcp-core mypy src tests && uv run --package huaweicloud-mcp-core pytest
       - run: cd server/mcp_server_gaussdb && uv run --package mcp-server-huaweicloud-gaussdb mypy src && uv run --package mcp-server-huaweicloud-gaussdb pytest
       - run: uv build --package huaweicloud-mcp-core && uv build --package mcp-server-huaweicloud-gaussdb

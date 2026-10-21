@@ -1,13 +1,13 @@
 ---
 name: huawei-cloud-gaussdb-manage
 description: |
-  通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB 实例。基于 MCP 0.3.7 的场景工具和 OpenAPI 目录，完成实例查询与创建、规格或容量变更、备份、参数调整、重启、慢 SQL 分析和删除。用户提到华为云 GaussDB、实例管理、数据库创建、备份、扩容、参数、慢 SQL 或 GaussDB OpenAPI 时使用。
+  通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB（openGauss）控制面，完成购买前选型与询价编排、实例生命周期、备份、参数、慢 SQL 和 DN 主备切换。适用于明确要求使用 MCP 管理华为云 GaussDB 的场景。NOT for: GaussDB(for MySQL)、直接 hcloud/KooCLI 运维、Terraform 建库、库内 SQL/DDL 或通用验收手册；这些场景分别路由到 huawei-gaussdb（或 huawei-cloud-gaussdb-instance-management）、对应 IaC Skill、huaweicloud-gaussdb-data 或专门验收 Skill。
 metadata:
   tags: [huawei-cloud, gaussdb, database, mcp, operations]
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
-# Huawei Cloud GaussDB Management
+# 华为云 GaussDB 管理
 
 ## 概述
 
@@ -20,24 +20,45 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 
 适用场景：
 
+- 购买前实时选型，调用外部 BSS 能力取得按需或包周期报价并检查余额。
 - 查询实例、拓扑、版本、规格、网络和运行状态。
 - 创建集中式或分布式 GaussDB，选择基础版、企业版或生态版。
 - 创建或查询备份，修改备份策略。
 - 变更规格、扩容存储/CN/DN、重启实例。
 - 查询并安全修改实例参数，分析慢 SQL。
+- 对集中式高可用实例执行 DN 分片主备切换并验证结果。
 - 通过动态 OpenAPI 目录访问没有专用场景工具的公开接口。
 
 典型用例：
 
 - “列出北京四的 GaussDB 实例，并告诉我哪些正在运行。”
 - “查询贵阳一可创建的基础版分布式规格，先不要创建。”
+- “比较开发、生产和大容量三档方案，并查询当前账号的实际价格。”
 - “创建一个开发测试用的集中式单副本实例。”
 - “先检查 `max_connections` 是否可改，再给我变更预览。”
+- “把集中式实例的备用 DN 升为主节点，先给我切换计划。”
 - “分析这个实例最近一小时的慢 SQL，并按平均耗时排序。”
+
+## 能力边界与路由
+
+只在用户明确要求通过本仓库的 MCP 管理 **GaussDB（openGauss）控制面**时使用本 Skill。
+多个 GaussDB Skill 同时安装时，按以下规则选择，不能对同一次写操作同时调用两套实现：
+
+| 用户意图 | 路由 |
+|---|---|
+| MCP 方式管理 GaussDB（openGauss），含动态 OpenAPI、参数安全、慢 SQL、主备切换 | 本 Skill |
+| 直接使用 hcloud/KooCLI，或同时管理 GaussDB(for MySQL) 和 GaussDB（openGauss） | `huawei-gaussdb` 或 `huawei-cloud-gaussdb-instance-management` |
+| 库内查询、写入、DDL、账号或元数据操作 | 已安装时使用 `huaweicloud-gaussdb-data` 数据面 MCP |
+| Terraform/IaC 创建与销毁 | 对应 GaussDB IaC Skill |
+| 独立运维手册、上线验收或安全基线报告 | 专门的运维/验收 Skill |
+
+本 Skill 不把 GaussDB(for MySQL) 当作 GaussDB（openGauss）的部署形态，也不通过管控面
+OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器或 Skill，不把请求静默改成其他产品。
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 版本为 `0.3.7` 或兼容版本。
+1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.3.7`。以运行时
+   `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
 3. 使用独立 IAM 用户或临时凭证，并按实际操作授予最小权限。需要的系统策略、授权项和
@@ -80,6 +101,27 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 5. 跟踪创建任务，再用 `get_instance` 验证实例状态。测试实例用完后，仅在用户明确授权删除该
    实例时执行删除流程。
 
+### 购买前选型与询价
+
+1. 收集区域、产品类型、集中式/分布式、部署形态、版本、CPU/内存、存储类型与容量、节点数、
+   计费模式、购买时长、是否需要 EIP/备份以及预算上限。缺少关键输入时停在候选方案阶段。
+2. 调用 `discover_create_options` 和 `list_flavors` 获取当前区域的实时可售组合，不复用其他区域
+   的规格码或价格。
+3. 给出三档候选，但必须以实时可售性为准：开发测试优先 `single`，生产高可用优先 `triset`，
+   大容量或横向扩展场景比较 `combined` / `hws` 分布式方案。
+4. GaussDB MCP 不直接暴露 BSS。通过已连接的华为云 BSS/计费工具分别调用
+   `ListOnDemandResourceRatings`（按需）、`ListRateOnPeriodDetail`（包周期）和
+   `ShowCustomerAccountBalances`（账户余额）。请求字段和商品编码必须来自 BSS 实时查询或价格
+   计算器，不能从 GaussDB `spec_code` 猜测。
+5. 将计算节点、存储、备份、公网和其他计费项分开列出，再给出三档总价、币种、价格单位、
+   优惠口径和查询时间。只有返回单位明确为小时价时，才可按用户认可的月小时数换算月成本，
+   并把该小时数标为估算假设。
+6. 余额查询失败、账号无 BSS 权限或商品编码无法映射时，返回“未取得权威报价”，并提供价格
+   计算器或人工确认路径；不得编造金额，也不得据此自动创建实例。
+
+详细流程、权限边界和结果模板见
+[references/purchase-estimation.md](references/purchase-estimation.md)。
+
 ### 参数修改
 
 1. 调用 `get_instance_parameters(instance_id, name, modifiable_only=true)` 获取当前实例的实时
@@ -89,6 +131,22 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 3. 对需要重启或被标记为敏感的参数，先获取工具预览；用户确认后再以 `confirm=true` 调用
    `update_instance_parameters`。
 4. 修改后再次查询参数确认生效。需要重启时单独说明影响并取得重启授权。
+
+### 主备切换与容灾
+
+1. 先用 `get_instance` 读取实例和组件，只允许状态正常、具备主备 DN 的实例进入切换计划；
+   单副本不支持 DN 主备切换。
+2. 从目标备用 DN 的组件中取得真实 `node_id`、`component_id`、`role` 和 `distributed_id`。
+   每个分片只选择一个待升主的备用 DN，不凭名称猜组件 ID。
+3. 调用 `describe_openapi_operation(operation="switch_shard")` 复核运行时 Schema。当前请求形态为
+   `{"instance_id":"...","body":{"shards":[{"node_id":"...","component_id":"dn_..."}]}}`。
+4. 展示目标实例、分片、当前主节点、待升主节点、连接中断影响和验证方案。取得对这组精确组件
+   的显式确认后，调用 `invoke_dangerous_openapi(operation="switch_shard", request=..., confirm=true)`。
+5. 返回 `job_id` 后调用 `get_job` 跟踪到终态；任务名通常为 `SWITCHDN`，但以云端响应为准。
+6. 再次调用 `get_instance`，确认目标组件已成为 Primary、原主节点变为 Standby，并核对
+   `distributed_id` 的分片映射。不要假设该字段一定变化或一定保持不变。
+
+切换属于 `DANGEROUS`，期间连接可能中断。失败后先读取任务和实例状态，不自动重试切换。
 
 ### 删除或其他危险操作
 
@@ -122,6 +180,7 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 | 备份策略 | `get_backup_policy`, `configure_backup_policy` | READ/WRITE |
 | 慢 SQL | `analyze_slow_sql` | READ/敏感数据 |
 | 异步任务 | `get_job` | READ |
+| DN 主备切换 | `describe_openapi_operation` → `invoke_dangerous_openapi`（`switch_shard`） | DANGEROUS |
 | 删除实例 | `delete_instance` | DANGEROUS |
 
 全部工具、关键参数和调用约束见
@@ -131,14 +190,14 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 
 | 参数 | 必需 | 默认值 | 确认规则 |
 |---|---:|---|---|
-| Region | 是 | 凭证中的 `region` | 每次跨区域操作都显式说明 |
-| Instance ID | 实例操作必需 | 无 | 写操作前通过实时查询核对名称和状态 |
-| Product type | 创建时必需 | `basic` | 从 `basic` / `enterprise` / `ecology` 中选择 |
-| HA mode | 创建时必需 | `centralization_standard` | 分布式使用 `enterprise` 创建模式 |
-| Deployment mode | 创建时必需 | 由发现工具推导 | 只使用实时可用组合 |
-| Version | 创建/规格查询可选 | 云端返回值 | 不假设每个区域都有相同版本 |
-| Flavor | 创建/规格变更必需 | 无 | 使用实时 `spec_code`，禁止写死 |
-| Billing | 创建/变更必需 | 不推断 | 包周期和自动支付必须明确授权 |
+| 区域 | 是 | 凭证中的 `region` | 每次跨区域操作都显式说明 |
+| 实例 ID | 实例操作必需 | 无 | 写操作前通过实时查询核对名称和状态 |
+| 产品类型 | 创建时必需 | `basic` | 从 `basic` / `enterprise` / `ecology` 中选择 |
+| 高可用模式 | 创建时必需 | `centralization_standard` | 分布式使用 `enterprise` 创建模式 |
+| 部署形态 | 创建时必需 | 由发现工具推导 | 只使用实时可用组合 |
+| 版本 | 创建/规格查询可选 | 云端返回值 | 不假设每个区域都有相同版本 |
+| 规格 | 创建/规格变更必需 | 无 | 使用实时 `spec_code`，禁止写死 |
+| 计费模式 | 创建/变更必需 | 不推断 | 包周期和自动支付必须明确授权 |
 | `confirm` | 受保护写操作必需 | `false` | DANGEROUS 必须为 `true`；普通写操作按护栏结果处理 |
 
 备份策略中的 `period` 是星期列表，例如 `1,3,5`；`differential_period` 是分钟间隔，只能为
@@ -190,13 +249,16 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 
 - [MCP 安装与配置](references/mcp-installation-guide.md)：安装、客户端注册、凭证优先级和热加载。
 - [IAM 权限策略](references/iam-policies.md)：只读、写入、危险操作及 Project 自动发现权限。
-- [MCP 工具参考](references/related-tools.md)：22 个场景/目录工具与关键参数。
+- [MCP 工具参考](references/related-tools.md)：当前场景/目录工具与关键参数。
+- [购买前选型与询价](references/purchase-estimation.md)：BSS 路由、三档方案和预算输出。
 - [验证方法](references/verification-method.md)：本地与云端验证步骤。
 - [验收标准](references/acceptance-criteria.md)：功能、错误处理和安全通过条件。
 
 ## 注意事项
 
 - 当前版本不包含 DRS。
+- 当前 MCP 只管理 GaussDB（openGauss）控制面；数据面 SQL/DDL 路由到
+  `huaweicloud-gaussdb-data`（若已安装），GaussDB(for MySQL) 路由到对应 Skill。
 - 公开 OpenAPI 目录随安装的华为云 SDK 变化，先查询目录再调用。
 - `logger` 的查询可见不等于公开接口可以创建，禁止静默转换为 `triset`。
 - 不在 Skill、示例、日志或回复中保存真实 AK/SK、SecurityToken、数据库密码或完整慢 SQL。

@@ -2,6 +2,15 @@
 
 All notable user-visible changes are recorded here. This project follows semantic versioning.
 
+## [Unreleased]
+
+### Changed
+
+- Updated the GaussDB management Skill to `1.1.0` with explicit routing against overlapping
+  KooCLI/data-plane skills, a BSS-backed purchase-estimation workflow, and DN switchover guidance.
+- Added a safe stdio smoke script that verifies MCP initialization, core tool discovery,
+  credential-backed instance listing, and read-only write blocking without printing resource data.
+
 ## [0.3.7] - 2026-10-19
 
 ### Added
