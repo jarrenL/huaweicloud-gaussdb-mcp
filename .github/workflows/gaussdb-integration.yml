@@ -1,0 +1,54 @@
+name: GaussDB and shared core compatibility
+
+on:
+  pull_request:
+    paths:
+      - "libs/huaweicloud_mcp_core/**"
+      - "server/mcp_server_gaussdb/**"
+      - "skills/database/gaussdb/**"
+      - ".github/workflows/gaussdb-integration.yml"
+  push:
+    paths:
+      - "libs/huaweicloud_mcp_core/**"
+      - "server/mcp_server_gaussdb/**"
+      - "skills/database/gaussdb/**"
+      - ".github/workflows/gaussdb-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12"]
+        package:
+          - libs/huaweicloud_mcp_core
+          - server/mcp_server_rfs
+          - server/mcp_server_rc
+          - server/mcp_server_gaussdb
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python ${{ matrix.python }}
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src tests
+      - run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+      - run: uv build --out-dir "$RUNNER_TEMP/gaussdb-integration-build"
+      - name: Validate the management Skill
+        if: matrix.package == 'server/mcp_server_gaussdb'
+        run: |
+          uv run ruff check ../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts
+          uv run python ../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts/validate-skill.py
+      - name: Smoke-test registration and read-only guardrails
+        if: matrix.package == 'server/mcp_server_gaussdb'
+        run: >-
+          uv run python ../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts/smoke.py
+          --skip-cloud -- uv run --directory "$PWD" mcp_server_gaussdb

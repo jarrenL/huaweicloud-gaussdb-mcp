@@ -1,0 +1,1 @@
+"""Scenario-oriented MCP tools."""

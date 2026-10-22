@@ -14,6 +14,11 @@
 - **[RC MCP](server/mcp_server_rc/README.md)**：资源中心——全局资源检索与分组管理、资源关系
   查询、ResourceQL 高级查询。
 
+### 数据库
+
+- **[GaussDB MCP](server/mcp_server_gaussdb/README.md)**：GaussDB（openGauss）实例、备份、
+  参数、慢 SQL、异步任务，以及按风险分流的完整 OpenAPI 目录。
+
 ## 开发者文档
 
 完整开发指南见 [docs/development/](docs/development/README.md)，按功能特性拆为 10 篇：核心包逐模块 API、
@@ -44,4 +49,4 @@ uv run mcp_server_rfs
 
 ## License
 
-MIT
+MIT。迁入的 GaussDB 子包保留 [Apache-2.0 许可证](server/mcp_server_gaussdb/LICENSE)。

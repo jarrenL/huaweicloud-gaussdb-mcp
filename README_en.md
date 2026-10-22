@@ -11,6 +11,11 @@ Huawei Cloud MCP Server shared repository: provides MCP tools for each Huawei Cl
 - **[RFS MCP](server/mcp_server_rfs/README_en.md)**: Resource Formation Service — one-click HCL template deployment as stacks, dry-run preview for execution plans, root-cause diagnosis for failed deployments, secure decommissioning.
 - **[RC MCP](server/mcp_server_rc/README_en.md)**: Resource Center — global resource search and group management, resource relationship queries, advanced ResourceQL queries.
 
+### Database
+
+- **[GaussDB MCP](server/mcp_server_gaussdb/README_en.md)**: GaussDB (openGauss) instances,
+  backups, parameters, slow SQL, asynchronous jobs, and a risk-separated OpenAPI catalog.
+
 ## Developer Documentation
 
 The complete development guide is available at [docs/development/](docs/development/README.md), split into 10 feature-focused documents: core package modular API, tool scenario methodology, service/client layers, guardrails, output & errors, three-tier testing, hands-on service creation from scratch, engineering & release. Reference implementation: `server/mcp_server_rfs/`; scaffold: `docs/development/template/`.
@@ -37,4 +42,4 @@ See [docs/08-new-service-walkthrough.md](docs/development/08-new-service-walkthr
 
 ## License
 
-MIT
+MIT. The imported GaussDB subpackage retains its [Apache-2.0 license](server/mcp_server_gaussdb/LICENSE).

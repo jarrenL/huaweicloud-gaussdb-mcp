@@ -36,3 +36,7 @@
 ## 旧文档迁移说明
 
 本目录各篇按功能特性拆分自历史单文件规范；原始内容备份为仓库根的 `DEVELOPMENT_SPEC2.md`。旧锚点链接（如 `#7-安全护栏`）请改用本目录相对链接（如 [05-guardrails.md](05-guardrails.md)）。
+
+## GaussDB 接入
+
+- [公共核心包 1.2 兼容说明](core-1.2-migration.md)
