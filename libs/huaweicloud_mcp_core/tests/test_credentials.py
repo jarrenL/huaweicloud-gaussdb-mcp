@@ -15,6 +15,7 @@ from huaweicloud_mcp_core.credentials import (
     CredentialScope,
     build_credentials,
     reset_project_cache,
+    resolve_project_context,
     resolve_project_id,
 )
 from huaweicloud_mcp_core.errors import McpToolError
@@ -117,3 +118,30 @@ def test_build_credentials_with_security_token() -> None:
     _FakeIamClient.projects = [SimpleNamespace(id="pid-iam")]
     credentials = build_credentials(CredentialScope.PROJECT, _settings(security_token="tok-1"))
     assert credentials.security_token == "tok-1"
+
+
+def test_project_context_includes_domain_and_is_account_scoped() -> None:
+    _FakeIamClient.projects = [SimpleNamespace(id="pid-a", domain_id="domain-a")]
+    first = resolve_project_context(_settings(access_key="account-a"))
+    assert (first.project_id, first.domain_id) == ("pid-a", "domain-a")
+    _FakeIamClient.projects = [SimpleNamespace(id="pid-b", domain_id="domain-b")]
+    second = resolve_project_context(_settings(access_key="account-b"))
+    assert (second.project_id, second.domain_id) == ("pid-b", "domain-b")
+    assert len(_FakeIamClient.instances) == 2
+
+
+def test_explicit_context_skips_iam_and_global_credentials_keep_domain() -> None:
+    settings = _settings(project_id="pid", domain_id="domain")
+    assert resolve_project_context(settings).domain_id == "domain"
+    assert _FakeIamClient.instances == []
+    credentials = build_credentials(CredentialScope.GLOBAL, settings)
+    assert credentials.domain_id == "domain"
+
+
+def test_explicit_project_filters_context_lookup() -> None:
+    _FakeIamClient.projects = [
+        SimpleNamespace(id="other", domain_id="wrong"),
+        SimpleNamespace(id="selected", domain_id="right"),
+    ]
+    result = resolve_project_context(_settings(project_id="selected"))
+    assert (result.project_id, result.domain_id) == ("selected", "right")

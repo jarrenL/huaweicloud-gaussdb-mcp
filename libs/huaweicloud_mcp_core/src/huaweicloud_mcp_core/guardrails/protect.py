@@ -24,7 +24,13 @@ def extract_tag_set(value: Any) -> set[str]:
             if isinstance(item, str):
                 tags.add(item)
             elif isinstance(item, dict):
-                tags.update(extract_tag_set(item))
+                if "key" in item:
+                    tag_key = str(item["key"])
+                    tags.add(tag_key)
+                    if item.get("value") is not None:
+                        tags.add(f"{tag_key}={item['value']}")
+                else:
+                    tags.update(extract_tag_set(item))
     return tags
 
 
@@ -53,7 +59,7 @@ def match_resource(
                 key, value = tag.split("=", 1)
                 actual[key] = value
             else:
-                actual[tag] = None
+                actual.setdefault(tag, None)
         for wanted in spec.tags:
             if "=" in wanted:
                 key, value = wanted.split("=", 1)

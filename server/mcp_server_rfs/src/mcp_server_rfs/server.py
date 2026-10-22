@@ -3,15 +3,15 @@
 
 """FastMCP instance construction for the RFS server (guardrails auto-installed)."""
 
-from starlette.responses import JSONResponse
-
 from huaweicloud_mcp_core.server import build_server
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 mcp = build_server("rfs")
 
 
-@mcp.custom_route("/health", methods=["GET"])
-async def health_check(_request) -> JSONResponse:
+@mcp.custom_route("/health", methods=["GET"])  # type: ignore[untyped-decorator]  # MCP SDK decorator.
+async def health_check(_request: Request) -> JSONResponse:
     """Lightweight liveness probe used by the MCP client/agent.
 
     The standard MCP protocol runs on /mcp; clients that probe /health

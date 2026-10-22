@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import threading
+from dataclasses import dataclass
 from enum import Enum
 
 from huaweicloudsdkcore.auth.credentials import BasicCredentials, GlobalCredentials
@@ -14,7 +15,15 @@ from huaweicloud_mcp_core.config import McpSettings
 from huaweicloud_mcp_core.errors import McpToolError
 
 _IAM_ENDPOINT = "https://iam.myhuaweicloud.com"
-_PROJECT_CACHE: dict[str, str] = {}
+
+
+@dataclass(frozen=True)
+class ProjectContext:
+    project_id: str
+    domain_id: str | None = None
+
+
+_PROJECT_CACHE: dict[tuple[str, str, str, str | None, str | None], ProjectContext] = {}
 _CACHE_LOCK = threading.Lock()
 
 
@@ -23,13 +32,20 @@ class CredentialScope(Enum):
     GLOBAL = "global"
 
 
-def resolve_project_id(settings: McpSettings | None = None) -> str:
-    """Resolve project_id: explicit env override first, then IAM lookup (cached)."""
+def resolve_project_context(settings: McpSettings | None = None) -> ProjectContext:
+    """Resolve regional project and its owning domain with an account-scoped cache."""
     settings = settings or McpSettings.from_env()
-    if settings.project_id:
-        return settings.project_id
+    if settings.project_id and settings.domain_id:
+        return ProjectContext(settings.project_id, settings.domain_id)
+    cache_key = (
+        settings.access_key,
+        settings.region,
+        settings.iam_endpoint,
+        settings.project_id,
+        settings.domain_id,
+    )
     with _CACHE_LOCK:
-        cached = _PROJECT_CACHE.get(settings.region)
+        cached = _PROJECT_CACHE.get(cache_key)
     if cached:
         return cached
 
@@ -39,7 +55,10 @@ def resolve_project_id(settings: McpSettings | None = None) -> str:
     if settings.security_token:
         credentials = credentials.with_security_token(settings.security_token)
     client = (
-        IamClient.new_builder().with_credentials(credentials).with_endpoint(_IAM_ENDPOINT).build()
+        IamClient.new_builder()
+        .with_credentials(credentials)
+        .with_endpoint(settings.iam_endpoint)
+        .build()
     )
     try:
         response = client.keystone_list_projects(KeystoneListProjectsRequest(name=settings.region))
@@ -59,17 +78,30 @@ def resolve_project_id(settings: McpSettings | None = None) -> str:
                 "manually (console: My Credentials > Project List)."
             ),
         ) from exc
-    projects = list(response.projects or [])
-    if not projects:
+    projects = [
+        project
+        for project in (response.projects or [])
+        if not settings.project_id or str(project.id) == settings.project_id
+    ]
+    if not projects or not projects[0].id:
         raise McpToolError(
             code="MCP_PROJECT_NOT_FOUND",
             message=f"No IAM project found for region '{settings.region}'.",
             hint="Set HUAWEICLOUD_PROJECT_ID explicitly (console: My Credentials > Project List).",
         )
-    project_id = str(projects[0].id)
+    domain_id = getattr(projects[0], "domain_id", None)
+    context = ProjectContext(
+        str(projects[0].id), str(domain_id) if domain_id else settings.domain_id
+    )
     with _CACHE_LOCK:
-        _PROJECT_CACHE[settings.region] = project_id
-    return project_id
+        _PROJECT_CACHE[cache_key] = context
+    return context
+
+
+def resolve_project_id(settings: McpSettings | None = None) -> str:
+    """Retain the project-ID-only API and explicit-ID IAM short circuit."""
+    settings = settings or McpSettings.from_env()
+    return settings.project_id or resolve_project_context(settings).project_id
 
 
 def build_credentials(
@@ -82,6 +114,8 @@ def build_credentials(
         credentials: BasicCredentials | GlobalCredentials = (
             GlobalCredentials().with_ak(settings.access_key).with_sk(settings.secret_key)
         )
+        if settings.domain_id:
+            credentials = credentials.with_domain_id(settings.domain_id)
         if settings.security_token:
             credentials = credentials.with_security_token(settings.security_token)
         return credentials

@@ -262,3 +262,16 @@ async def test_non_json_tool_result_masked_as_text() -> None:
 
     result = await middleware(_tool_ctx("list_widgets", {}), call_next)
     assert "abc123XYZdef456" not in result.content[0].text
+
+
+async def test_dangerous_call_requires_confirmation_without_a_rule() -> None:
+    result = await _run(_middleware(), "delete_widget", {"widget_id": "w-1"})
+    assert _payload(result)["confirmation_required"] is True
+    allowed = await _run(_middleware(), "delete_widget", {"widget_id": "w-1", "confirm": True})
+    assert _payload(allowed) == {"ok": True}
+
+
+async def test_warn_rule_does_not_bypass_dangerous_confirmation() -> None:
+    middleware = _middleware(rules=[Rule(id="notice", action="warn")])
+    result = await _run(middleware, "delete_widget", {"widget_id": "w-1"})
+    assert _payload(result)["confirmation_required"] is True

@@ -17,6 +17,8 @@ _FIELD_KEY_MARKERS = (
     "passwd",
     "private_key",
     "auth",
+    "access_key",
+    "accesskey",
 )
 
 _VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -55,6 +57,8 @@ class MaskingEngine:
                     result[f"{key}_masked"] = True
                 else:
                     result[str(key)] = self.mask(item)
+            if any(str(key).endswith("_masked") for key in result):
+                result["_masked"] = True
             return result
         return value
 

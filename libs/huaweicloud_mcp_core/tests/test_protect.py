@@ -16,6 +16,13 @@ from huaweicloud_mcp_core.guardrails.protect import (
 )
 from huaweicloud_mcp_core.guardrails.rules import ResourceSpec, Rule
 
+
+def test_cloud_tag_arrays_keep_key_and_value_protection() -> None:
+    tags = extract_tag_set([{"key": "env", "value": "prod"}, {"key": "locked"}])
+    assert {"env", "env=prod", "locked"} <= tags
+    assert match_resource(ResourceSpec(tags=("env=prod",)), tags=tags) == "tag:env=prod"
+
+
 SPEC = ResourceSpec(
     ids=("stack-123",),
     id_prefixes=("prod-",),

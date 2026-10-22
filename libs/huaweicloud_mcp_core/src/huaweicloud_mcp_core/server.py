@@ -15,7 +15,13 @@ from huaweicloud_mcp_core.guardrails.middleware import GuardrailsMiddleware
 from huaweicloud_mcp_core.guardrails.rules import load_rules
 
 
-def build_server(service_name: str, settings: McpSettings | None = None) -> MCPServer:
+def build_server(
+    service_name: str,
+    settings: McpSettings | None = None,
+    *,
+    version: str = "",
+    instructions: str | None = None,
+) -> MCPServer:
     """Create the MCPServer instance and auto-install the guardrails middleware."""
     resolved = settings or McpSettings.from_env(require_credentials=False)
     rules = load_rules(resolved)
@@ -27,6 +33,8 @@ def build_server(service_name: str, settings: McpSettings | None = None) -> MCPS
     )
     return MCPServer(
         f"huaweicloud-{service_name}",
+        version=version,
+        instructions=instructions,
         middleware=[middleware],
     )
 

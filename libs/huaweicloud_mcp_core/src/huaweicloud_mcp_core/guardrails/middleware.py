@@ -50,7 +50,14 @@ class GuardrailsMiddleware:
     ) -> Any:
         if ctx.method != "tools/call":
             return await call_next(ctx)
-        params = dict(ctx.params or {})
+        params_value = ctx.params
+        if params_value is None or isinstance(params_value, dict):
+            params = dict(params_value or {})
+        else:
+            params = {
+                "name": getattr(params_value, "name", ""),
+                "arguments": getattr(params_value, "arguments", None),
+            }
         tool_name = str(params.get("name") or "")
         arguments: dict[str, Any] = dict(params.get("arguments") or {})
         risk = get_tool_risk(tool_name)
@@ -196,6 +203,13 @@ class GuardrailsMiddleware:
             )
         hits = evaluate_rules(self._rules, tool_name, risk, arguments)
         if not hits:
+            if risk is ToolRisk.DANGEROUS and arguments.get("confirm") is not True:
+                if not tool_supports_confirm(tool_name):
+                    raise McpToolError(
+                        "MCP_GUARDRAIL_BLOCKED",
+                        "Confirmation is required but this tool has no confirm parameter.",
+                    )
+                return "confirm", []
             return None
         strictest = strictest_hit(hits)
         assert strictest is not None
@@ -205,6 +219,12 @@ class GuardrailsMiddleware:
                 action = "block"
             elif arguments.get("confirm") is True:
                 return None
+        if (
+            risk is ToolRisk.DANGEROUS
+            and arguments.get("confirm") is not True
+            and action != "block"
+        ):
+            return "confirm", hits
         return action, hits
 
     def _post_process(self, result: Any, warn_hits: list[RuleHit]) -> Any:

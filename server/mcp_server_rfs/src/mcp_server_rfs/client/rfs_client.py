@@ -152,9 +152,7 @@ class RfsClient:
                 enable_deletion_protection=enable_deletion_protection,
                 description=description,
             )
-            request = CreateStackRequest(
-                client_request_id=_new_client_request_id(), body=body
-            )
+            request = CreateStackRequest(client_request_id=_new_client_request_id(), body=body)
             return cast(dict[str, Any], sdk_to_dict(self._client.create_stack(request)))
 
         return await asyncio.to_thread(_call)
