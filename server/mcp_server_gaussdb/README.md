@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.4.0`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.5.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -57,6 +57,8 @@ uvx mcp-server-huaweicloud-gaussdb
 - 只读模式、规则化阻断/确认/告警、敏感信息脱敏和 JSONL 审计。
 - 统一分页、字段白名单、长字段截断和可供模型理解的错误结构。
 
+- 通过 CES 实时发现和批量查询实例、节点及组件监控指标。
+
 ## 可用工具
 
 | 工具 | 场景 | 风险 | API 文档 |
@@ -78,15 +80,32 @@ uvx mcp-server-huaweicloud-gaussdb
 | `configure_backup_policy` | 修改自动备份策略 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `analyze_slow_sql` | 按平均执行时间分析慢 SQL，时间支持毫秒时间戳或带时区 ISO 8601 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_297.html) |
 | `get_job`, `wait_job` | 单次查询任务，或在超时范围内轮询到终态 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `list_monitoring_metrics` | 实时发现监控指标及完整维度 | READ | [CES API](https://support.huaweicloud.com/api-ces/ces_03_0023.html) |
+| `query_monitoring_metrics` | 批量查询监控曲线及摘要 | READ | [CES API](https://support.huaweicloud.com/api-ces/ces_03_0034.html) |
 | `list_openapi_operations` | 分页检索当前 SDK 的全部公开 GaussDB OpenAPI | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `describe_openapi_operation` | 查询指定接口的完整嵌套请求结构 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_read_openapi` | 调用目录中归类为只读的接口 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_write_openapi` | 调用目录中归类为可逆或新增型写接口 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_dangerous_openapi` | 调用删除、停机、切换、恢复、升级和计费敏感接口 | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 
+
+### CES 监控
+
+1. 调用 `list_monitoring_metrics(instance_id=...)`，按 marker 分页发现当前区域和实例实际
+   上报的指标。命名空间为 `SYS.GAUSSDBV5`，不固定指标清单。
+2. 将选中条目连同完整 `dimensions` 传给 `query_monitoring_metrics`。实例、节点和组件指标
+   分别需要相应层级的维度；CPU 指标通常需要实例和节点两个维度。
+3. 时间支持毫秒时间戳或带时区 ISO 8601；支持聚合粒度和 average/min/max/sum/variance。
+   单次最多 20 条序列，默认每条显示最近 20 个点；摘要覆盖本次取得的所有窗口内数据。
+   超过 CES 3000 点预算时要求缩短时间、增大粒度或拆批，避免云端静默缩短查询窗口。
+
+沿用现有 AK/SK、STS、region 和 Project ID；另外需要 `ces:metrics:list` 与
+`ces:metricData:list` 权限。没有采样时返回 `no_data`，不将其视作零值或运行正常。
+具体维度和采集限制见 [GaussDB 监控指标](https://support.huaweicloud.com/intl/zh-cn/usermanual-gaussdb/gaussdb_01_238.html)。
+
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.4.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.5.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
@@ -211,6 +230,7 @@ Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX �
 | `HUAWEICLOUD_DOMAIN_ID` | 否 | 使用全局凭证时的账号 ID |
 | `HUAWEICLOUD_SECURITY_TOKEN` | 否 | 临时安全令牌 |
 | `HUAWEICLOUD_ENDPOINT` | 否 | 自定义 GaussDB Endpoint |
+| `HUAWEICLOUD_CES_ENDPOINT` | 否 | 可选的 CES Endpoint；默认由当前区域的 CES SDK 解析 |
 | `HUAWEICLOUD_IAM_ENDPOINT` | 否 | 项目 ID 自动发现使用的 IAM Endpoint，默认 `https://iam.myhuaweicloud.com` |
 | `HUAWEICLOUD_MCP_CREDENTIALS_FILE` | 否 | MCP 自管热加载凭证 JSON；权限必须为 `0600` |
 | `HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE` | 否 | devkit S1 路径；默认 `~/.config/huaweicloud/credentials.json` |

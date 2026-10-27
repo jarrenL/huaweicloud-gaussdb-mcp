@@ -9,7 +9,7 @@ from huaweicloud_mcp_core.guardrails.middleware import GuardrailsMiddleware
 from huaweicloud_mcp_core.security import ToolRisk, get_tool_risk, tool_supports_confirm
 
 from mcp_server_gaussdb.server import mcp
-from mcp_server_gaussdb.tools import backup, instance, observability, openapi
+from mcp_server_gaussdb.tools import backup, instance, monitoring, observability, openapi
 
 EXPECTED = {
     "list_instances": ToolRisk.READ,
@@ -30,6 +30,8 @@ EXPECTED = {
     "analyze_slow_sql": ToolRisk.READ,
     "get_job": ToolRisk.READ,
     "wait_job": ToolRisk.READ,
+    "list_monitoring_metrics": ToolRisk.READ,
+    "query_monitoring_metrics": ToolRisk.READ,
     "list_openapi_operations": ToolRisk.READ,
     "describe_openapi_operation": ToolRisk.READ,
     "invoke_read_openapi": ToolRisk.READ,
@@ -40,7 +42,7 @@ EXPECTED = {
 
 async def test_tools_registered_and_guarded() -> None:
     tools = await mcp.list_tools()
-    assert mcp.version == "0.4.0"
+    assert mcp.version == "0.5.0"
     assert {tool.name for tool in tools} == set(EXPECTED)
     assert {name: get_tool_risk(name) for name in EXPECTED} == EXPECTED
     assert all(
@@ -68,6 +70,7 @@ async def test_all_tools_pass_arguments(monkeypatch) -> None:  # type: ignore[no
     for module in (backup, instance, observability):
         monkeypatch.setattr(module, "GaussDBService", lambda: stub)
     monkeypatch.setattr(openapi, "OpenApiService", lambda: stub)
+    monkeypatch.setattr(monitoring, "MonitoringService", lambda: stub)
     assert await instance.list_instances() == {"called": "list_instances"}
     await instance.get_instance("i")
     await instance.list_flavors()
@@ -84,6 +87,8 @@ async def test_all_tools_pass_arguments(monkeypatch) -> None:  # type: ignore[no
     await backup.get_backup_policy("i")
     await backup.configure_backup_policy("i", 7, "21:00-22:00", "1")
     await observability.analyze_slow_sql("i", ["n"], 1, 2)
+    await monitoring.list_monitoring_metrics("i")
+    await monitoring.query_monitoring_metrics("i", [], 1, 2)
     await observability.get_job("j")
     await observability.wait_job("j", timeout_seconds=30, poll_interval_seconds=2)
     await openapi.list_openapi_operations()
@@ -98,7 +103,11 @@ async def test_all_tools_pass_arguments(monkeypatch) -> None:  # type: ignore[no
         "invoke_write_openapi",
         "invoke_dangerous_openapi",
     }
-    assert {name for name, _ in stub.calls} == (set(EXPECTED) - openapi_tools) | {
+    assert {name for name, _ in stub.calls} == (
+        set(EXPECTED) - openapi_tools - {"list_monitoring_metrics", "query_monitoring_metrics"}
+    ) | {
+        "list_metrics",
+        "query_metrics",
         "list_operations",
         "describe_operation",
         "invoke",

@@ -33,6 +33,8 @@ MINIMUM_TOOLS = {
     "get_instance_parameters",
     "get_job",
     "wait_job",
+    "list_monitoring_metrics",
+    "query_monitoring_metrics",
     "list_openapi_operations",
     "describe_openapi_operation",
     "invoke_dangerous_openapi",

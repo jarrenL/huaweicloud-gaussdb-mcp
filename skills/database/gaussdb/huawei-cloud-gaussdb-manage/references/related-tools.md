@@ -2,7 +2,7 @@
 
 ## 概述
 
-兼容的 MCP Server 当前至少暴露 18 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出
+兼容的 MCP Server 当前至少暴露 20 个场景工具和 5 个 OpenAPI 目录/调用工具。以下参数仅列出
 Agent 编排时最需要的部分；实际版本、工具数量和调用参数以 MCP 运行时返回为准。
 
 ## 实例与创建
@@ -41,6 +41,18 @@ Agent 编排时最需要的部分；实际版本、工具数量和调用参数�
 | `analyze_slow_sql` | `instance_id`, `node_ids`, `start_time`, `end_time`, `threshold`, `limit` | 时间是 Unix 毫秒或带时区 ISO 8601；SQL 文本按敏感数据处理 |
 | `get_job` | `job_id` | 跟踪创建、备份、变更、扩容、重启和参数任务 |
 | `wait_job` | `job_id`, `timeout_seconds`, `poll_interval_seconds` | 最多等待 1800 秒；本地超时后继续等待同一任务，不重复提交写操作 |
+
+## CES 监控
+
+| 工具 | 关键参数 | 关键约束 |
+|---|---|---|
+| `list_monitoring_metrics` | `instance_id`, `metric_name`, `node_id`, `component_id`, `limit`, `marker` | 实时发现；组件筛选需要节点；保留完整维度和 marker |
+| `query_monitoring_metrics` | `instance_id`, `metrics`, `start_time`, `end_time`, `period`, `aggregation`, `max_points` | 每批 1-20 条真实序列；默认最近 20 点；无数据不视作零 |
+
+`metrics` 可直接复用发现结果条目。namespace 为 `SYS.GAUSSDBV5`；实例、节点和组件维度依次为
+`gaussdbv5_instance_id`、`gaussdbv5_node_id`、`gaussdbv5_component_id`，使用每条指标实际返回的
+层级。period 可为 `1`、`60`、`300`、`1200`、`3600`、`14400`、`86400`；`1` 表示原始值，
+aggregation 强制为 average。`max_points` 为 1-100，摘要不受显示截断影响。
 
 ## OpenAPI 目录
 

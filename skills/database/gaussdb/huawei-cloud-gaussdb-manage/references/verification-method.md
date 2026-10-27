@@ -58,7 +58,7 @@ uv sync --directory server/mcp_server_gaussdb --frozen
 uv run --directory server/mcp_server_gaussdb mcp_server_gaussdb
 ```
 
-通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 23 个
+通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 25 个
 工具，包含 `discover_create_options`、`update_instance_parameters`、
 `describe_openapi_operation` 和 `invoke_dangerous_openapi`。新增兼容工具不应导致验证失败。
 
@@ -85,6 +85,9 @@ uv run --directory server/mcp_server_gaussdb mcp_server_gaussdb
 5. `list_openapi_operations(query="tag")` → `describe_openapi_operation`。
 6. `describe_openapi_operation(operation="switch_shard")`，确认风险是 `DANGEROUS`，且请求要求
    `instance_id` 和 `body.shards[].node_id/component_id`。
+
+7. 有 CES 权限时，调用 `list_monitoring_metrics`，复制实际返回的指标和完整维度查询最近一小时。
+   核对单位、时间窗、采样数量、摘要及 `no_data`；跨节点/组件时不复用错误维度。
 
 成功标准：所有响应均为结构化对象；分页字段可继续读取；没有把其他区域的静态数据混入结果。
 

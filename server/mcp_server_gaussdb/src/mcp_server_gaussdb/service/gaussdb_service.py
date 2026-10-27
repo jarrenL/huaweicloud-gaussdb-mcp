@@ -4,7 +4,6 @@ import asyncio
 import difflib
 import re
 import time
-from datetime import datetime
 from typing import Any
 
 from huaweicloud_mcp_core import (
@@ -19,6 +18,7 @@ from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
 
 from ..client.gaussdb_client import GaussDBClient
 from ..client.vpc_client import VpcResourceClient
+from .time_utils import normalize_time_ms
 
 _INSTANCE_FIELDS = (
     "id",
@@ -148,39 +148,6 @@ _HIGH_RISK_PARAMETER_RE = re.compile(
     r"enable_slot_log$|most_available_sync$|replconninfo)",
     re.IGNORECASE,
 )
-
-
-def _normalize_time_ms(value: int | str, field_name: str) -> int:
-    """Normalize an epoch-millisecond or timezone-aware ISO 8601 value."""
-    if isinstance(value, bool):
-        normalized: int | None = None
-    elif isinstance(value, int):
-        normalized = value
-    elif isinstance(value, str):
-        text = value.strip()
-        if text.isdigit():
-            normalized = int(text)
-        else:
-            try:
-                iso_value = f"{text[:-1]}+00:00" if text.upper().endswith("Z") else text
-                parsed = datetime.fromisoformat(iso_value)
-                if parsed.tzinfo is None or parsed.utcoffset() is None:
-                    raise ValueError("timezone required")
-                normalized = int(parsed.timestamp() * 1000)
-            except (OverflowError, ValueError):
-                normalized = None
-    else:
-        normalized = None
-    if normalized is None:
-        raise McpToolError(
-            "MCP_INVALID_ARGS",
-            f"{field_name} must be Unix epoch milliseconds or ISO 8601 with a timezone.",
-            hint=(
-                f"Use an integer such as 1761046200000 or a value such as "
-                f"2026-10-21T15:30:00+08:00 / 2026-10-21T07:30:00Z for {field_name}."
-            ),
-        )
-    return normalized
 
 
 def _job_hints(job: dict[str, Any]) -> list[str]:
@@ -1407,8 +1374,8 @@ class GaussDBService:
         threshold: int = 1,
         limit: int = 20,
     ) -> dict[str, Any]:
-        start_time_ms = _normalize_time_ms(start_time, "start_time")
-        end_time_ms = _normalize_time_ms(end_time, "end_time")
+        start_time_ms = normalize_time_ms(start_time, "start_time")
+        end_time_ms = normalize_time_ms(end_time, "end_time")
         if start_time_ms >= end_time_ms:
             raise McpToolError("MCP_INVALID_ARGS", "start_time must be earlier than end_time.")
         if not node_ids or len(node_ids) > 100:

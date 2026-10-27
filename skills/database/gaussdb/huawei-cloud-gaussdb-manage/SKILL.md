@@ -4,7 +4,7 @@ description: |
   通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB（openGauss）控制面，完成购买前选型与询价编排、实例生命周期、备份、参数、慢 SQL 和 DN 主备切换。适用于明确要求使用 MCP 管理华为云 GaussDB 的场景。NOT for: GaussDB(for MySQL)、直接 hcloud/KooCLI 运维、Terraform 建库、库内 SQL/DDL 或通用验收手册；这些场景分别路由到 huawei-gaussdb（或 huawei-cloud-gaussdb-instance-management）、对应 IaC Skill、huaweicloud-gaussdb-data 或专门验收 Skill。
 metadata:
   tags: [huawei-cloud, gaussdb, database, mcp, operations]
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # 华为云 GaussDB 管理
@@ -26,6 +26,7 @@ GaussDB、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域、实例 ID
 - 创建或查询备份，修改备份策略。
 - 变更规格、扩容存储/CN/DN、重启实例。
 - 查询并安全修改实例参数，分析慢 SQL。
+- 通过 CES 查询 CPU、内存、存储、会话与事务等实时可发现的监控指标。
 - 对集中式高可用实例执行 DN 分片主备切换并验证结果。
 - 通过动态 OpenAPI 目录访问没有专用场景工具的公开接口。
 
@@ -57,7 +58,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.4.0`。以运行时
+1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.5.0`。以运行时
    `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
@@ -132,6 +133,16 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
    `update_instance_parameters`。
 4. 修改后再次查询参数确认生效。需要重启时单独说明影响并取得重启授权。
 
+### 监控诊断
+
+1. 先用 `list_monitoring_metrics(instance_id=...)` 分页获取 CES 实际上报的指标。不要套用其他
+   数据库的 namespace，也不要把某个区域、版本或拓扑的指标列表当作全局可用列表。
+2. 将选中的条目连同完整 `dimensions` 传给 `query_monitoring_metrics`；不要省略 CPU 的节点
+   维度或会话指标的组件维度。使用带时区 ISO 8601 或毫秒时间戳指定时间窗。
+3. 无数据不等于零或正常。检查 `status`、`observed_window` 和采样数量；曲线截断时摘要仍基于
+   本次收到的全部窗口内数据。范围超限时拆批、增大 period 或缩短时间，不自动省略历史窗口。
+4. CES 查询复用现有凭证，另需 `ces:metrics:list` 和 `ces:metricData:list` 权限。
+
 ### 主备切换与容灾
 
 1. 先用 `get_instance` 读取实例和组件，只允许状态正常、具备主备 DN 的实例进入切换计划；
@@ -191,6 +202,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 | 备份策略 | `get_backup_policy`, `configure_backup_policy` | READ/WRITE |
 | 慢 SQL | `analyze_slow_sql`（毫秒时间戳或带时区 ISO 8601） | READ/敏感数据 |
 | 异步任务 | `get_job`, `wait_job` | READ |
+| 监控 | `list_monitoring_metrics`, `query_monitoring_metrics` | READ |
 | DN 主备切换 | `describe_openapi_operation` → `invoke_dangerous_openapi`（`switch_shard`） | DANGEROUS |
 | 删除实例 | `delete_instance` | DANGEROUS |
 

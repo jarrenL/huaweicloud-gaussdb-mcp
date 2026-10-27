@@ -51,6 +51,17 @@ GaussDB 是区域级服务。应在目标区域项目中授权，并按实际启
 体系相关，使用前按调用主体核对对应 API 的授权要求；不要因为询价失败而给 GaussDB MCP
 授予全局管理员权限。
 
+## CES 监控权限
+
+监控工具复用区域项目及凭证，但 GaussDB 的授权不会自动授予 CES 权限：
+
+- `list_monitoring_metrics`：`ces:metrics:list`。
+- `query_monitoring_metrics`：`ces:metricData:list`。
+
+按当前授权模型为目标项目单独授予以上查询权限。依据见
+[CES 指标发现](https://support.huaweicloud.com/intl/zh-cn/api-ces/ces_03_0023.html)及
+[CES 批量查询](https://support.huaweicloud.com/intl/zh-cn/api-ces/ces_03_0034.html)。
+
 ## 最小权限策略示例
 
 下面示例覆盖只读发现、实例查询、参数查询、备份查询和慢 SQL。部署前应由账号管理员按当前

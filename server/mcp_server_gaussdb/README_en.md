@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.4.0`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.5.0`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -57,6 +57,8 @@ Database / cloud resource management / operations automation.
 - Reuse devkit S1 credentials or hot-reload AK/SK and temporary tokens from an MCP credential file.
 - Read-only mode, block/confirm/warn rules, recursive masking, and JSONL audit output.
 
+- Discover and batch-query instance, node and component monitoring metrics through CES.
+
 ## Available Tools
 
 | Tool | Purpose | Risk | API documentation |
@@ -72,14 +74,33 @@ Database / cloud resource management / operations automation.
 | `create_manual_backup`, `configure_backup_policy` | Create a backup or update policy | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `analyze_slow_sql` | Analyze performance using epoch-millisecond or timezone-aware ISO 8601 windows | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_297.html) |
 | `get_job`, `wait_job` | Inspect one job state or poll to a terminal state with a bounded timeout | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `list_monitoring_metrics` | Discover live monitoring metrics and full dimensions | READ | [CES API](https://support.huaweicloud.com/intl/en-us/api-ces/ces_03_0023.html) |
+| `query_monitoring_metrics` | Batch-query monitoring series and summaries | READ | [CES API](https://support.huaweicloud.com/intl/en-us/api-ces/ces_03_0034.html) |
 | `list_openapi_operations`, `describe_openapi_operation` | Discover all public SDK operations and request shapes | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_read_openapi` | Invoke catalog-classified read operations | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_write_openapi` | Invoke catalog-classified additive or reversible operations | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_dangerous_openapi` | Invoke destructive, disruptive, restore, upgrade, or billing-sensitive operations | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 
+
+### CES monitoring
+
+1. Call `list_monitoring_metrics(instance_id=...)` and follow markers to discover live metrics in
+   `SYS.GAUSSDBV5` for the current region and instance. No fixed metric catalog is embedded.
+2. Pass selected items, including their complete ordered `dimensions`, to `query_monitoring_metrics`.
+   Instance, node and component metrics have different dimension hierarchies.
+3. Use epoch milliseconds or timezone-aware ISO 8601 and select a period and aggregation. Up to
+   20 series are queried per call, with the latest 20 displayed points per series by default.
+   Summaries use all received in-window samples. Queries over the CES 3000-point budget are
+   rejected with instructions to narrow the window, increase the period or split the batch.
+
+Existing AK/SK, STS, region and Project ID are reused. Grant `ces:metrics:list` and
+`ces:metricData:list` separately; GaussDB permissions alone do not grant CES access. Empty series
+are marked `no_data`, never zero or healthy. `HUAWEICLOUD_CES_ENDPOINT` optionally overrides the
+SDK regional endpoint. See [GaussDB metrics and collection constraints](https://support.huaweicloud.com/intl/en-us/usermanual-gaussdb/gaussdb_01_238.html).
+
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.4.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.5.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
 

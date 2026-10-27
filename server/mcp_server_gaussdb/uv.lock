@@ -744,8 +744,19 @@ dev = [
 ]
 
 [[package]]
+name = "huaweicloudsdkces"
+version = "3.1.219"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huaweicloudsdkcore" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1b/27/73b8bbd0371d17062d9deb20f4d50b982cc0688f2384675f2d73ba990cf1/huaweicloudsdkces-3.1.219-py3-none-any.whl", hash = "sha256:d67499a7edc0cb994bcf2308053761f49847478eb389352f674207a6692b4025", size = 835360, upload-time = "2026-10-22T07:51:19.255Z" },
+]
+
+[[package]]
 name = "huaweicloudsdkcore"
-version = "3.1.218"
+version = "3.1.219"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -758,7 +769,7 @@ dependencies = [
     { name = "six" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/26/c8ab408487b7ed232d73faa538d8b1c1923b840e2298ccdcb62845895931/huaweicloudsdkcore-3.1.218-py3-none-any.whl", hash = "sha256:f3f5db94521a2a2df7beb3d3be7969aa4d6c2204c9e35fcb1a1a79a0d87d2f80", size = 71462, upload-time = "2026-10-15T08:04:26.437Z" },
+    { url = "https://files.pythonhosted.org/packages/81/59/2a21f70720fb6ba3017f96e7f3e5a18bdb40745a835c93d4d51593915b27/huaweicloudsdkcore-3.1.219-py3-none-any.whl", hash = "sha256:faa036a0ec81f20f57172201e2829e7ad4bd872423f077ac1d4035752e392e48", size = 71462, upload-time = "2026-10-22T07:51:48.13Z" },
 ]
 
 [[package]]
@@ -1011,10 +1022,11 @@ wheels = [
 
 [[package]]
 name = "mcp-server-huaweicloud-gaussdb"
-version = "0.4.0"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "huaweicloud-mcp-core" },
+    { name = "huaweicloudsdkces" },
     { name = "huaweicloudsdkgaussdbforopengauss" },
     { name = "huaweicloudsdkvpc" },
 ]
@@ -1032,6 +1044,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "huaweicloud-mcp-core", directory = "../../libs/huaweicloud_mcp_core" },
+    { name = "huaweicloudsdkces", specifier = ">=3.1.218,<4" },
     { name = "huaweicloudsdkgaussdbforopengauss", specifier = ">=3.1.216,<4" },
     { name = "huaweicloudsdkvpc", specifier = ">=3.1.216,<4" },
 ]

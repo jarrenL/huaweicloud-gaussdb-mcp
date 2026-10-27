@@ -13,4 +13,4 @@ mcp = build_server(
     ),
 )
 
-from .tools import backup, instance, observability, openapi  # noqa: E402,F401
+from .tools import backup, instance, monitoring, observability, openapi  # noqa: E402,F401
