@@ -3,7 +3,7 @@
 ## 概述
 
 本文用于安装 `mcp-server-huaweicloud-gaussdb`、把它注册到 MCP 客户端，并验证凭证读取。
-当前 Skill 要求 MCP Server 不低于 `0.5.0`、Python 3.10+ 和 MCP Python SDK 2.x。运行时
+当前 Skill 要求 MCP Server 不低于 `0.5.1`、Python 3.10+ 和 MCP Python SDK 2.x。运行时
 `initialize` 与 `tools/list` 是版本和能力的权威来源。
 
 ## 安装方式
@@ -41,7 +41,7 @@ MCP 客户端使用绝对路径注册：
 ### 从 PyPI 使用 UVX（发布后）
 
 只有 PyPI 已同时发布 `huaweicloud-mcp-core>=1.2.0,<2` 和
-`mcp-server-huaweicloud-gaussdb>=0.5.0,<1` 时，下面的命令才可直接使用：
+`mcp-server-huaweicloud-gaussdb>=0.5.1,<1` 时，下面的命令才可直接使用：
 
 ```bash
 uvx mcp-server-huaweicloud-gaussdb

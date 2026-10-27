@@ -64,8 +64,8 @@ def main() -> int:
             errors.append("frontmatter description must be a multiline string")
         if not re.search(r"(?m)^metadata:\s*$", meta):
             errors.append("frontmatter metadata is missing")
-        if not re.search(r"(?m)^\s+version:\s*[\"']?1\.3\.0[\"']?\s*$", meta):
-            errors.append("metadata.version must be 1.3.0")
+        if not re.search(r"(?m)^\s+version:\s*[\"']?1\.3\.1[\"']?\s*$", meta):
+            errors.append("metadata.version must be 1.3.1")
         tags_match = re.search(r"(?m)^\s+tags:\s*\[([^]]*)\]\s*$", meta)
         if not tags_match:
             errors.append("metadata.tags is missing")

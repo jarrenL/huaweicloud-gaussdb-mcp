@@ -18,7 +18,7 @@ async def list_monitoring_metrics(
     limit: int = 20,
     marker: str | None = None,
 ) -> dict[str, Any]:
-    """Discover live CES monitoring metrics for a GaussDB instance.
+    """Discover one live CES metric level: instance, node, or component.
 
     Scenario: find CPU, memory, disk, session or transaction metrics actually reported by the
     selected instance, including centralized/distributed node and component dimensions.
@@ -26,14 +26,15 @@ async def list_monitoring_metrics(
     Args:
         instance_id: GaussDB instance ID obtained from list_instances.
         metric_name: Optional exact metric ID, e.g. rds001_cpu_util; discover availability first.
-        node_id: Optional node ID from get_instance or previous metric discovery.
-        component_id: Optional component ID; requires node_id.
+        node_id: Omit for instance-level metrics only. For CPU/memory, pass an actual node ID
+            from get_instance. CES does not expand partial dimensions or wildcard IDs.
+        component_id: Optional DN/CN component ID from get_instance; requires node_id.
         limit: Page size, clamped to 1-100; default 20.
         marker: CES marker from the preceding response; omitted for the first page.
 
     Returns:
-        Live metric IDs, units, complete ordered dimensions, and pagination metadata. Reuse the
-        returned metric objects in query_monitoring_metrics. Requires ces:metrics:list permission.
+        Live metric IDs, units, normalized dimensions, scope, and pagination metadata. To cover
+        the whole instance, repeat for each node and DN/CN component. Requires ces:metrics:list.
     """
     return await MonitoringService().list_metrics(
         instance_id=instance_id,

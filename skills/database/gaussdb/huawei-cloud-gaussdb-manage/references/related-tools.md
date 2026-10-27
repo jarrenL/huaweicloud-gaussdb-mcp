@@ -49,6 +49,8 @@ Agent 编排时最需要的部分；实际版本、工具数量和调用参数�
 | `list_monitoring_metrics` | `instance_id`, `metric_name`, `node_id`, `component_id`, `limit`, `marker` | 实时发现；组件筛选需要节点；保留完整维度和 marker |
 | `query_monitoring_metrics` | `instance_id`, `metrics`, `start_time`, `end_time`, `period`, `aggregation`, `max_points` | 每批 1-20 条真实序列；默认最近 20 点；无数据不视作零 |
 
+发现按精确层级查询：instance_id 对应实例层；加真实 node_id 对应节点层；再加 component_id
+对应组件层。先用 get_instance 取拓扑；不要用星号或假定实例层包含下层。
 `metrics` 可直接复用发现结果条目。namespace 为 `SYS.GAUSSDBV5`；实例、节点和组件维度依次为
 `gaussdbv5_instance_id`、`gaussdbv5_node_id`、`gaussdbv5_component_id`，使用每条指标实际返回的
 层级。period 可为 `1`、`60`、`300`、`1200`、`3600`、`14400`、`86400`；`1` 表示原始值，

@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.5.0`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.5.1`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -91,10 +91,11 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### CES 监控
 
-1. 调用 `list_monitoring_metrics(instance_id=...)`，按 marker 分页发现当前区域和实例实际
-   上报的指标。命名空间为 `SYS.GAUSSDBV5`，不固定指标清单。
+1. 先用 `get_instance` 获取节点和组件。仅传 `instance_id` 查询实例层指标；逐个增加实际
+   `node_id` 查询 CPU/内存等节点指标，再增加 DN/CN 的 `component_id` 查询组件指标。
+   每层分别按 marker 分页；CES 不会自动展开下层，也不能用 `*` 代替真实 ID。
 2. 将选中条目连同完整 `dimensions` 传给 `query_monitoring_metrics`。实例、节点和组件指标
-   分别需要相应层级的维度；CPU 指标通常需要实例和节点两个维度。
+   分别需要相应层级的维度；工具会将 CES 返回的无序维度归一为实例、节点、组件顺序。
 3. 时间支持毫秒时间戳或带时区 ISO 8601；支持聚合粒度和 average/min/max/sum/variance。
    单次最多 20 条序列，默认每条显示最近 20 个点；摘要覆盖本次取得的所有窗口内数据。
    超过 CES 3000 点预算时要求缩短时间、增大粒度或拆批，避免云端静默缩短查询窗口。
@@ -105,7 +106,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.5.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.5.1` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。

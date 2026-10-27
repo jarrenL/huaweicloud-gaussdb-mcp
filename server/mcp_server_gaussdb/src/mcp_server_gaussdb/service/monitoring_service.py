@@ -13,6 +13,7 @@ GAUSSDB_NAMESPACE = "SYS.GAUSSDBV5"
 _INSTANCE_DIMENSION = "gaussdbv5_instance_id"
 _NODE_DIMENSION = "gaussdbv5_node_id"
 _COMPONENT_DIMENSION = "gaussdbv5_component_id"
+_DIMENSION_ORDER = {_INSTANCE_DIMENSION: 0, _NODE_DIMENSION: 1, _COMPONENT_DIMENSION: 2}
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]*\Z")
 _PERIODS = {1, 60, 300, 1200, 3600, 14400, 86400}
 _AGGREGATIONS = {"average", "variance", "min", "max", "sum"}
@@ -54,7 +55,7 @@ def _descriptor(item: dict[str, Any], instance_id: str) -> dict[str, Any]:
         raise _invalid("Each metric must include 1-4 ordered dimensions from CES discovery.")
     normalized: list[dict[str, str]] = []
     seen: set[str] = set()
-    for index, dimension in enumerate(dimensions):
+    for dimension in dimensions:
         if not isinstance(dimension, dict) or set(dimension) != {"name", "value"}:
             raise _invalid("Every dimension must contain exactly name and value.")
         name, value = dimension["name"], dimension["value"]
@@ -62,14 +63,12 @@ def _descriptor(item: dict[str, Any], instance_id: str) -> dict[str, Any]:
             raise _invalid(
                 "Dimension names must be valid, unique CES names of at most 32 characters."
             )
-        if name == _NODE_DIMENSION and index != 1:
-            raise _invalid("The node dimension must follow the instance dimension.")
-        if name == _COMPONENT_DIMENSION and (
-            index != 2 or normalized[1]["name"] != _NODE_DIMENSION
-        ):
-            raise _invalid("The component dimension must follow the instance and node dimensions.")
         seen.add(name)
         normalized.append({"name": name, "value": _resource_id(value, "dimension.value")})
+    if _COMPONENT_DIMENSION in seen and _NODE_DIMENSION not in seen:
+        raise _invalid("The component dimension requires the instance and node dimensions.")
+    # CES discovery can return dimensions in alphabetical order rather than hierarchy order.
+    normalized.sort(key=lambda dimension: _DIMENSION_ORDER.get(dimension["name"], 3))
     if normalized[0] != {"name": _INSTANCE_DIMENSION, "value": instance_id}:
         raise _invalid(
             "Every metric must start with the selected GaussDB instance dimension and ID."
@@ -126,13 +125,27 @@ class MonitoringService:
             {key: metric[key] for key in _METRIC_FIELDS if metric.get(key) is not None}
             for metric in response.get("metrics") or []
         ]
+        for metric in items:
+            metric["dimensions"] = sorted(
+                metric.get("dimensions") or [],
+                key=lambda dimension: _DIMENSION_ORDER.get(dimension["name"], 3),
+            )
         meta = response.get("meta_data") or {}
         next_marker = meta.get("marker") if items else None
         return {
             **page_result(items, total=meta.get("total"), marker=next_marker),
             "namespace": GAUSSDB_NAMESPACE,
             "instance_id": instance_id,
+            "scope": "component"
+            if component_id is not None
+            else "node"
+            if node_id is not None
+            else "instance",
             "hints": [
+                "CES filters select one exact dimension level, not all descendants. "
+                "Omitting node_id returns instance-level metrics only. Call get_instance and "
+                "repeat discovery with each actual node_id for CPU/memory; add each DN/CN "
+                "component_id for session/transaction metrics. Wildcard IDs are not discovery.",
                 "Reuse each metric's complete ordered dimensions in query_monitoring_metrics; "
                 "instance, node, and component metrics have different dimensions.",
                 "Availability depends on region, topology, version and collection state. "

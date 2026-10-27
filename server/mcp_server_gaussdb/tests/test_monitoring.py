@@ -70,6 +70,32 @@ async def test_discovery_returns_live_hierarchy_and_ces_pagination() -> None:
     assert empty["items"] == [] and empty["marker"] is None
 
 
+async def test_ces_alphabetical_component_dimensions_round_trip_without_manual_reordering() -> None:
+    client = FakeCesClient()
+    component = {
+        **METRIC,
+        "metric_name": "rds053_online_session",
+        "dimensions": [COMPONENT, INSTANCE, NODE],
+    }
+    client.list_response = {"metrics": [component]}
+    client.batch_response = {
+        "metrics": [{**component, "datapoints": [{"timestamp": START, "average": 5}]}]
+    }
+    service = MonitoringService(client)
+    discovered = await service.list_metrics(instance_id="i", node_id="n", component_id="dn_6001")
+    assert discovered["scope"] == "component"
+    assert discovered["items"][0]["dimensions"] == [INSTANCE, NODE, COMPONENT]
+    result = await service.query_metrics(
+        instance_id="i", metrics=discovered["items"], start_time=START, end_time=END
+    )
+    assert result["items"][0]["summary"]["latest_value"] == 5
+    # Also accept an unnormalized object captured directly from CES before this fix.
+    await service.query_metrics(
+        instance_id="i", metrics=[component], start_time=START, end_time=END
+    )
+    assert client.calls[-1][1]["metrics"][0]["dimensions"] == [INSTANCE, NODE, COMPONENT]
+
+
 @pytest.mark.parametrize(
     "arguments",
     [

@@ -86,8 +86,10 @@ uv run --directory server/mcp_server_gaussdb mcp_server_gaussdb
 6. `describe_openapi_operation(operation="switch_shard")`，确认风险是 `DANGEROUS`，且请求要求
    `instance_id` 和 `body.shards[].node_id/component_id`。
 
-7. 有 CES 权限时，调用 `list_monitoring_metrics`，复制实际返回的指标和完整维度查询最近一小时。
-   核对单位、时间窗、采样数量、摘要及 `no_data`；跨节点/组件时不复用错误维度。
+7. 有 CES 权限时，用 `get_instance` 获取拓扑，分别分页发现实例、各节点、各 DN/CN 组件的指标，
+   复制完整维度查询最近半小时（每批最多 20 条，period=60）。确认发现结果可直接回传查询，
+   不要求手动重排维度；核对单位、时间窗、采样数量、摘要及 `no_data`。新建实例缺项时在
+   有界等待后重新发现，不把某次实测数量写成固定验收条件。
 
 成功标准：所有响应均为结构化对象；分页字段可继续读取；没有把其他区域的静态数据混入结果。
 

@@ -42,7 +42,7 @@ EXPECTED = {
 
 async def test_tools_registered_and_guarded() -> None:
     tools = await mcp.list_tools()
-    assert mcp.version == "0.5.0"
+    assert mcp.version == "0.5.1"
     assert {tool.name for tool in tools} == set(EXPECTED)
     assert {name: get_tool_risk(name) for name in EXPECTED} == EXPECTED
     assert all(

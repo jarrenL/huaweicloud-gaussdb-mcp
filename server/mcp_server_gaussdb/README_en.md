@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.5.0`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.5.1`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -84,10 +84,11 @@ Database / cloud resource management / operations automation.
 
 ### CES monitoring
 
-1. Call `list_monitoring_metrics(instance_id=...)` and follow markers to discover live metrics in
-   `SYS.GAUSSDBV5` for the current region and instance. No fixed metric catalog is embedded.
+1. Call `get_instance` for topology. Discover instance metrics with instance_id only, node metrics
+   with an actual node_id, then component metrics with both node_id and a DN/CN component_id.
+   Follow markers separately at each level. CES does not expand partial dimensions or wildcard IDs.
 2. Pass selected items, including their complete ordered `dimensions`, to `query_monitoring_metrics`.
-   Instance, node and component metrics have different dimension hierarchies.
+   The tool normalizes CES dimension order to instance, node, then component.
 3. Use epoch milliseconds or timezone-aware ISO 8601 and select a period and aggregation. Up to
    20 series are queried per call, with the latest 20 displayed points per series by default.
    Summaries use all received in-window samples. Queries over the CES 3000-point budget are
@@ -100,7 +101,7 @@ SDK regional endpoint. See [GaussDB metrics and collection constraints](https://
 
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.5.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.5.1` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
 
