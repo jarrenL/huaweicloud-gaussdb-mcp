@@ -99,6 +99,10 @@ Existing AK/SK, STS, region and Project ID are reused. Grant `ces:metrics:list` 
 are marked `no_data`, never zero or healthy. `HUAWEICLOUD_CES_ENDPOINT` optionally overrides the
 SDK regional endpoint. See [GaussDB metrics and collection constraints](https://support.huaweicloud.com/intl/en-us/usermanual-gaussdb/gaussdb_01_238.html).
 
+The [metric reference (Chinese)](../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/references/monitoring-metrics.md)
+explains 58 observed metrics, their units, dimension levels and interpretation. Discover available
+metrics at runtime for each instance; the reference is not a fixed availability list.
+
 ### Complete OpenAPI access
 
 At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.5.1` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.

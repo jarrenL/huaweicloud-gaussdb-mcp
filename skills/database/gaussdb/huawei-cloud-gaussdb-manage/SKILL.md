@@ -136,6 +136,9 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 
 ### 监控诊断
 
+需要解释指标、单位或状态码时，读取
+[references/monitoring-metrics.md](references/monitoring-metrics.md)；指标是否可用仍以实时发现为准。
+
 1. 先用 `get_instance` 获取节点和组件；分别查询实例层、逐个 node_id 的节点层，再查询各
    DN/CN component_id 的组件层，并分别分页。仅传 instance_id 不会返回节点/组件指标；
    CES 不展开层级，也不能用 `*` 替代真实 ID。不要固定任何区域、版本或拓扑的指标清单。

@@ -104,6 +104,10 @@ uvx mcp-server-huaweicloud-gaussdb
 `ces:metricData:list` 权限。没有采样时返回 `no_data`，不将其视作零值或运行正常。
 具体维度和采集限制见 [GaussDB 监控指标](https://support.huaweicloud.com/intl/zh-cn/usermanual-gaussdb/gaussdb_01_238.html)。
 
+各项指标的中文含义、单位、三层维度和读数注意点见
+[监控指标参考](../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/references/monitoring-metrics.md)。
+该文档整理了实测的 58 项指标，当前实例的可用项仍以实时发现为准。
+
 ### 全量 OpenAPI 访问
 
 服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.5.1` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：

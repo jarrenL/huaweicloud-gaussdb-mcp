@@ -44,6 +44,8 @@ Agent 编排时最需要的部分；实际版本、工具数量和调用参数�
 
 ## CES 监控
 
+指标的中文含义、单位与读数注意点见 [监控指标参考](monitoring-metrics.md)。
+
 | 工具 | 关键参数 | 关键约束 |
 |---|---|---|
 | `list_monitoring_metrics` | `instance_id`, `metric_name`, `node_id`, `component_id`, `limit`, `marker` | 实时发现；组件筛选需要节点；保留完整维度和 marker |
