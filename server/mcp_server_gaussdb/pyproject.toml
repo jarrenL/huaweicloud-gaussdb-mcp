@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-server-huaweicloud-gaussdb"
-version = "0.5.1"
+version = "0.6.0"
 description = "Huawei Cloud GaussDB management MCP Server"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ classifiers = [
 ]
 dependencies = [
   "huaweicloud-mcp-core>=1.2.0,<2",
+  "huaweicloudsdkbss>=3.1.218,<4",
   "huaweicloudsdkces>=3.1.218,<4",
   "huaweicloudsdkgaussdbforopengauss>=3.1.216,<4",
   "huaweicloudsdkvpc>=3.1.216,<4",
@@ -68,5 +69,6 @@ module = [
   "huaweicloudsdkgaussdbforopengauss.*",
   "huaweicloudsdkvpc.*",
   "huaweicloudsdkces.*",
+    "huaweicloudsdkbss.*",
 ]
 ignore_missing_imports = true

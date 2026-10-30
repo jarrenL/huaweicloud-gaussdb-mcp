@@ -9,9 +9,11 @@ from huaweicloud_mcp_core.guardrails.middleware import GuardrailsMiddleware
 from huaweicloud_mcp_core.security import ToolRisk, get_tool_risk, tool_supports_confirm
 
 from mcp_server_gaussdb.server import mcp
-from mcp_server_gaussdb.tools import backup, instance, monitoring, observability, openapi
+from mcp_server_gaussdb.tools import backup, billing, instance, monitoring, observability, openapi
 
 EXPECTED = {
+    "get_order": ToolRisk.READ,
+    "cancel_order": ToolRisk.DANGEROUS,
     "list_instances": ToolRisk.READ,
     "get_instance": ToolRisk.READ,
     "list_flavors": ToolRisk.READ,
@@ -42,7 +44,7 @@ EXPECTED = {
 
 async def test_tools_registered_and_guarded() -> None:
     tools = await mcp.list_tools()
-    assert mcp.version == "0.5.1"
+    assert mcp.version == "0.6.0"
     assert {tool.name for tool in tools} == set(EXPECTED)
     assert {name: get_tool_risk(name) for name in EXPECTED} == EXPECTED
     assert all(
@@ -71,6 +73,9 @@ async def test_all_tools_pass_arguments(monkeypatch) -> None:  # type: ignore[no
         monkeypatch.setattr(module, "GaussDBService", lambda: stub)
     monkeypatch.setattr(openapi, "OpenApiService", lambda: stub)
     monkeypatch.setattr(monitoring, "MonitoringService", lambda: stub)
+    monkeypatch.setattr(billing, "BillingService", lambda: stub)
+    await billing.get_order("ORDER")
+    await billing.cancel_order("ORDER", confirm=True)
     assert await instance.list_instances() == {"called": "list_instances"}
     await instance.get_instance("i")
     await instance.list_flavors()

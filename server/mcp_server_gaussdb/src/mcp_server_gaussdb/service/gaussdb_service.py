@@ -1045,13 +1045,17 @@ class GaussDBService:
             **_pick(response, ("job_id", "instance_id", "order_id")),
             **({"instance_id": instance["id"]} if instance.get("id") else {}),
         }
-        return single_result(
-            payload,
-            [
-                "Creation is asynchronous; call get_job with job_id until it reaches "
-                "a terminal state.",
-            ],
-        )
+        hints = []
+        if payload.get("order_id"):
+            hints.append(
+                "Call get_order with order_id to check billing status and the actual amount. "
+                "An unpaid order does not mean an instance has been provisioned. "
+                "To abandon an unpaid order, use cancel_order after confirmation."
+            )
+        if payload.get("job_id"):
+            hints.append("Creation is asynchronous; call wait_job with job_id to track completion.")
+        hints.append("Verify the final instance state with get_instance after provisioning.")
+        return single_result(payload, hints)
 
     async def delete_instance(self, *, instance_id: str) -> dict[str, Any]:
         response = await self._client.list_database_instances(

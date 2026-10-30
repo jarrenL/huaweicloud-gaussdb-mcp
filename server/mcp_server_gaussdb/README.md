@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.5.1`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.6.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -58,6 +58,7 @@ uvx mcp-server-huaweicloud-gaussdb
 - 统一分页、字段白名单、长字段截断和可供模型理解的错误结构。
 
 - 通过 CES 实时发现和批量查询实例、节点及组件监控指标。
+- 通过 BSS SDK 查询 GaussDB 包周期订单金额、状态和明细，确认后取消待支付订单。
 
 ## 可用工具
 
@@ -68,6 +69,8 @@ uvx mcp-server-huaweicloud-gaussdb
 | `list_flavors` | 创建或变更前查询可用规格 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_084.html) |
 | `discover_create_options` | 自动发现创建实例所需的全部云端参数并给出推荐配置 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `create_instance` | 创建 GaussDB 实例 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_017.html) |
+| `get_order` | 查询 GaussDB 订单状态、金额和分页明细 | READ | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00014.html) |
+| `cancel_order` | 取消待支付 GaussDB 订单；确认、保护检查并复查状态 | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00017.html) |
 | `delete_instance` | 永久删除实例；强制确认并二次检查云端保护属性 | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `resize_instance` | 变更 CPU/内存规格 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `expand_instance` | 扩容存储、CN 或 DN 分片 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_019.html) |
@@ -88,6 +91,40 @@ uvx mcp-server-huaweicloud-gaussdb
 | `invoke_write_openapi` | 调用目录中归类为可逆或新增型写接口 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `invoke_dangerous_openapi` | 调用删除、停机、切换、恢复、升级和计费敏感接口 | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 
+
+### 包周期订单
+
+`create_instance` 的 `configuration.charge_info` 支持包年/包月，例如：
+
+```json
+{
+  "charge_mode": "prePaid",
+  "period_type": "month",
+  "period_num": 1,
+  "is_auto_pay": false,
+  "is_auto_renew": false
+}
+```
+
+包月可选 1-9 个月，包年可选 1-3 年。先取得用户对计费配置和费用的授权。
+创建返回 `order_id` 时，用 `get_order(order_id=...)` 查询金额、币种、状态和明细；
+明细默认 20 条，使用返回的 marker 分页。`amount_after_discount` 为优惠后、不含券和卡的
+金额；金额需结合返回币种和度量单位解释。待支付订单不表示实例已经开通；返回 `job_id`
+时才使用 `wait_job` 跟踪任务，并在开通后通过 `get_instance` 验证实例状态。
+
+取消前先查询并确认准确订单，再调用 `cancel_order(order_id=..., confirm=true)`。
+服务重新检查云端待支付状态、支付时间、保护规则及全部明细，拒绝已支付、其他产品或混合产品
+订单；单次取消最多核验 1000 条明细。已取消订单返回幂等结果。取消后检查
+`cancellation_verified`；为 false 时继续用 `get_order` 查询，不盲目重复提交。
+
+订单工具复用 AK/SK、STS 和凭证热加载，使用全局 BSS SDK 凭证。中国站 BSS Endpoint 默认
+为 `https://bss.myhuaweicloud.com`，不随数据库区域拼接；其他站点通过
+`HUAWEICLOUD_BSS_ENDPOINT` 指定对应 BSS 地址。订单查询需 `billing:order:view`；取消需按
+账号所用授权模型核对 [BSS 权限说明](https://support.huaweicloud.com/api-oce/api_order_00017.html)
+（角色/策略授权可能涉及 `bss:order:update`）。只读模式拦截取消，危险操作需要确认并写入审计。
+
+支付、退款、资源退订及购买前询价需使用独立的计费能力。`confirm=true` 是调用参数，
+不等于服务端核验过人工审批；具体确认界面由 Agent 客户端实现。
 
 ### CES 监控
 
@@ -110,7 +147,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.5.1` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.6.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
@@ -236,6 +273,7 @@ Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX �
 | `HUAWEICLOUD_SECURITY_TOKEN` | 否 | 临时安全令牌 |
 | `HUAWEICLOUD_ENDPOINT` | 否 | 自定义 GaussDB Endpoint |
 | `HUAWEICLOUD_CES_ENDPOINT` | 否 | 可选的 CES Endpoint；默认由当前区域的 CES SDK 解析 |
+| `HUAWEICLOUD_BSS_ENDPOINT` | 否 | BSS Endpoint；默认 `https://bss.myhuaweicloud.com`，其他站点显式指定 |
 | `HUAWEICLOUD_IAM_ENDPOINT` | 否 | 项目 ID 自动发现使用的 IAM Endpoint，默认 `https://iam.myhuaweicloud.com` |
 | `HUAWEICLOUD_MCP_CREDENTIALS_FILE` | 否 | MCP 自管热加载凭证 JSON；权限必须为 `0600` |
 | `HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE` | 否 | devkit S1 路径；默认 `~/.config/huaweicloud/credentials.json` |

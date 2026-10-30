@@ -823,3 +823,43 @@ async def test_backup_policy(service, fake_client) -> None:  # type: ignore[no-u
             period="1,3,5",
         )
     assert excinfo.value.code == "MCP_BACKUP_POLICY_INCOMPLETE"
+
+
+@pytest.mark.parametrize("periodic", [False, True])
+async def test_create_routes_followup_to_the_returned_order_or_job(
+    service: GaussDBService,
+    fake_client: Any,
+    periodic: bool,
+) -> None:
+    fake_client.responses["create_database_instance"] = (
+        {"order_id": "ORDER", "instance": {"id": "i"}}
+        if periodic
+        else {"job_id": "JOB", "instance": {"id": "i"}}
+    )
+    result = await service.create_instance(
+        configuration={
+            "name": "test",
+            "datastore": {"type": "GaussDB", "version": "10.0.0"},
+            "ha": {
+                "mode": "centralization_standard",
+                "consistency": "strong",
+                "replication_mode": "sync",
+            },
+            "password": "test-password",
+            "flavor_ref": "f",
+            "volume": {"type": "ULTRAHIGH", "size": 40},
+            "availability_zone": "az1",
+            "vpc_id": "v",
+            "subnet_id": "s",
+            "security_group_id": "g",
+            "charge_info": {"charge_mode": "prePaid", "period_type": "month", "period_num": 1}
+            if periodic
+            else {"charge_mode": "postPaid"},
+        }
+    )
+    hints = " ".join(result["hints"])
+    if periodic:
+        assert result["order_id"] == "ORDER" and "get_order" in hints
+        assert "wait_job" not in hints
+    else:
+        assert result["job_id"] == "JOB" and "wait_job" in hints

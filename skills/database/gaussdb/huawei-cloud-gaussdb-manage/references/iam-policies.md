@@ -51,6 +51,17 @@ GaussDB 是区域级服务。应在目标区域项目中授权，并按实际启
 体系相关，使用前按调用主体核对对应 API 的授权要求；不要因为询价失败而给 GaussDB MCP
 授予全局管理员权限。
 
+## BSS 订单权限
+
+`get_order` 使用客户 BSS 全局凭证，身份策略授权项为 `billing:order:view`。
+`cancel_order` 还需按账号所用授权模型核对订单更新权限，角色/策略授权可能使用
+`bss:order:update`；当前取消 API 的身份策略文档未列出额外授权项。参见
+[订单详情](https://support.huaweicloud.com/api-oce/api_order_00014.html)和
+[取消待支付订单](https://support.huaweicloud.com/api-oce/api_order_00017.html)。
+不要因 GaussDB 读写权限正常就假设拥有 BSS 权限；本服务不会自动提权。
+默认 BSS 地址为中国站 `https://bss.myhuaweicloud.com`；其他站点需设置
+`HUAWEICLOUD_BSS_ENDPOINT`。沿用现有 AK/SK/STS，BSS 不使用数据库区域的 Project ID。
+
 ## CES 监控权限
 
 监控工具复用区域项目及凭证，但 GaussDB 的授权不会自动授予 CES 权限：

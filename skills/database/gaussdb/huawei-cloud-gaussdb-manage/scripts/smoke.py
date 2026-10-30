@@ -27,6 +27,8 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 MINIMUM_TOOLS = {
+    "get_order",
+    "cancel_order",
     "list_instances",
     "get_instance",
     "discover_create_options",
@@ -59,10 +61,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "server",
         nargs=argparse.REMAINDER,
-        help=(
-            "Server command after '--'. Defaults to "
-            "'uvx mcp-server-huaweicloud-gaussdb'."
-        ),
+        help=("Server command after '--'. Defaults to 'uvx mcp-server-huaweicloud-gaussdb'."),
     )
     return parser
 

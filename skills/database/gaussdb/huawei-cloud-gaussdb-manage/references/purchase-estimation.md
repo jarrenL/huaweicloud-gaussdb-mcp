@@ -35,8 +35,9 @@
 
 ## BSS 查询流程
 
-GaussDB MCP 当前不包含 BSS 客户端。Agent 必须使用已连接的华为云计费/BSS 工具、API
-Explorer 或受控的 BSS SDK/CLI，不能把 GaussDB OpenAPI 调用通道用于 BSS 请求。
+GaussDB MCP 的 BSS 客户端仅用于已有订单查询与取消。购买前询价、余额和支付仍需使用
+独立的华为云计费/BSS 工具、API Explorer 或受控的 BSS SDK/CLI，不能把 GaussDB OpenAPI
+调用通道用于 BSS 请求。`get_order` 可查看下单后的金额，不替代购买前报价。
 
 1. 按需报价：`ListOnDemandResourceRatings`。
 2. 包年/包月报价：`ListRateOnPeriodDetail`。

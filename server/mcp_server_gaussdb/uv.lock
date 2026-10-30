@@ -744,6 +744,17 @@ dev = [
 ]
 
 [[package]]
+name = "huaweicloudsdkbss"
+version = "3.1.220"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huaweicloudsdkcore" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/a8/07d941f0f2829b3d3ecbeceba294148fbdf19bc8cfd2081008bd1015e9ce/huaweicloudsdkbss-3.1.220-py3-none-any.whl", hash = "sha256:05afd6dd5126d96d15acc6167915f0b3ec5c8011fe63152379a7907b5cc124f8", size = 717533, upload-time = "2026-10-29T09:38:28.301Z" },
+]
+
+[[package]]
 name = "huaweicloudsdkces"
 version = "3.1.219"
 source = { registry = "https://pypi.org/simple" }
@@ -756,7 +767,7 @@ wheels = [
 
 [[package]]
 name = "huaweicloudsdkcore"
-version = "3.1.219"
+version = "3.1.220"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -769,7 +780,7 @@ dependencies = [
     { name = "six" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/59/2a21f70720fb6ba3017f96e7f3e5a18bdb40745a835c93d4d51593915b27/huaweicloudsdkcore-3.1.219-py3-none-any.whl", hash = "sha256:faa036a0ec81f20f57172201e2829e7ad4bd872423f077ac1d4035752e392e48", size = 71462, upload-time = "2026-10-22T07:51:48.13Z" },
+    { url = "https://files.pythonhosted.org/packages/77/a2/892ee95a3c937fb8c77563bfe459a3c4e27c7f6f790cb65ddbc3796e8a16/huaweicloudsdkcore-3.1.220-py3-none-any.whl", hash = "sha256:12a502163e7c66185b5a5a992a6548235cc3cce4e5053c2dc1d860443b8f26da", size = 71459, upload-time = "2026-10-29T09:39:15.516Z" },
 ]
 
 [[package]]
@@ -1022,10 +1033,11 @@ wheels = [
 
 [[package]]
 name = "mcp-server-huaweicloud-gaussdb"
-version = "0.5.1"
+version = "0.6.0"
 source = { editable = "." }
 dependencies = [
     { name = "huaweicloud-mcp-core" },
+    { name = "huaweicloudsdkbss" },
     { name = "huaweicloudsdkces" },
     { name = "huaweicloudsdkgaussdbforopengauss" },
     { name = "huaweicloudsdkvpc" },
@@ -1044,6 +1056,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "huaweicloud-mcp-core", directory = "../../libs/huaweicloud_mcp_core" },
+    { name = "huaweicloudsdkbss", specifier = ">=3.1.218,<4" },
     { name = "huaweicloudsdkces", specifier = ">=3.1.218,<4" },
     { name = "huaweicloudsdkgaussdbforopengauss", specifier = ">=3.1.216,<4" },
     { name = "huaweicloudsdkvpc", specifier = ">=3.1.216,<4" },
