@@ -4,7 +4,7 @@ description: |
   通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB（openGauss）控制面，完成购买前选型与询价编排、实例生命周期、备份、参数、慢 SQL、CES 监控诊断和 DN 主备切换。适用于明确要求使用 MCP 管理华为云 GaussDB 的场景。NOT for: GaussDB(for MySQL)、直接 hcloud/KooCLI 运维、Terraform 建库、库内 SQL/DDL 或通用验收手册；这些场景分别路由到 huawei-gaussdb（或 huawei-cloud-gaussdb-instance-management）、对应 IaC Skill、huaweicloud-gaussdb-data 或专门验收 Skill。
 metadata:
   tags: [huawei-cloud, gaussdb, database, mcp, operations]
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # 华为云 GaussDB 管理
@@ -24,7 +24,7 @@ GaussDB、BSS、CES、VPC 和 IAM OpenAPI。Skill 不保存会话状态；区域
 - 查询实例、拓扑、版本、规格、网络和运行状态。
 - 创建集中式或分布式 GaussDB，选择基础版、企业版或生态版。
 - 创建或查询备份，修改备份策略。
-- 查询 GaussDB 包周期订单的实际金额和状态，按明确授权取消待支付订单。
+- 查询 GaussDB 包周期订单金额和状态，按精确金额授权付款或取消待支付订单。
 - 变更规格、扩容存储/CN/DN、重启实例。
 - 查询并安全修改实例参数，分析慢 SQL。
 - 通过 CES 查询 CPU、内存、存储、会话与事务等实时可发现的监控指标。
@@ -60,7 +60,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.6.0`。以运行时
+1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.7.0`。以运行时
    `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
@@ -102,19 +102,25 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 4. 显示名称、区域、版本、产品类型、部署形态、规格、节点/副本、存储、AZ、网络、计费方式和
    预计影响，取得具体授权后调用 `create_instance`。
 5. 返回 `order_id` 时先用 `get_order` 获取状态、金额、币种和分页明细，不能把待支付订单视作
-   实例开通成功。取得付款授权后通过独立计费能力支付；本 MCP 不提供支付工具。返回
+   实例开通成功。取得订单、金额和币种的明确授权后调用 `pay_order`。返回
    `job_id` 时跟踪创建任务，再用 `get_instance` 验证实例状态。测试实例用完后，仅在用户明确授权删除该
    实例时执行删除流程。
 
-### 包周期订单查询与取消
+### 包周期订单查询、付款与取消
 
 1. 使用 `create_instance` 返回的准确 `order_id` 调用 `get_order`，按 marker 读取后续明细。
    保留金额、币种、度量单位和状态；优惠后金额不包含券、卡抵扣，不自行改写为最终支付金额。
-2. 用户明确放弃订单后，以 `confirm=true` 调用 `cancel_order`。该工具仅处理未支付的 GaussDB
+2. 用户选择付款时，展示准确订单号、配置、总额、币种和计费周期。取得明确授权后调用
+   `pay_order(order_id, expected_amount="十进制金额", currency="订单币种", confirm=true)`。
+   当前工具不主动选券或额外折扣，要求订单原价与优惠后金额均等于授权金额；有差异时交由费用
+   中心处理，不能改用较高金额重新付款。该金额校验是提交前检查，不能保证原子扣款上限。
+3. 付款提交或响应未知时，核对 `payment_verified` 并继续查询订单，不盲目重试；已处理订单
+   不再次付款。托管账号可能自动使用优惠，实际扣款以账单为准。最终用 `get_instance` 确认开通。
+4. 用户明确放弃订单后，以 `confirm=true` 调用 `cancel_order`。该工具仅处理未支付的 GaussDB
    订单；服务端复查云端状态和全部明细，拒绝其他产品、混合产品及已付款订单。
-3. 核对 `cancellation_verified`，为 false 时继续查询同一订单；已取消订单可返回幂等结果。
+5. 核对 `cancellation_verified`，为 false 时继续查询同一订单；已取消订单可返回幂等结果。
    已付款资源需另走退订流程，不能用取消订单或删除按需实例接口代替。
-4. 订单工具复用现有 AK/SK/STS，BSS 是全局服务，Endpoint 与数据库区域无关。
+6. 订单工具复用现有 AK/SK/STS，BSS 是全局服务，Endpoint 与数据库区域无关。
    `confirm=true` 不构成人工审批凭据，确认方式由 Agent 客户端实现。
 
 ### 购买前选型与询价
@@ -125,7 +131,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
    的规格码或价格。
 3. 给出三档候选，但必须以实时可售性为准：开发测试优先 `single`，生产高可用优先 `triset`，
    大容量或横向扩展场景比较 `combined` / `hws` 分布式方案。
-4. 本 MCP 的 BSS 工具限于已有订单查询和待支付订单取消。购买前询价和余额通过独立的 BSS/计费工具调用
+4. 本 MCP 的 BSS 工具覆盖已有订单查询、付款和待支付订单取消。购买前询价和余额通过独立的 BSS/计费工具调用
    `ListOnDemandResourceRatings`（按需）、`ListRateOnPeriodDetail`（包周期）和
    `ShowCustomerAccountBalances`（账户余额）。请求字段和商品编码必须来自 BSS 实时查询或价格
    计算器，不能从 GaussDB `spec_code` 猜测。
@@ -216,6 +222,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 | 创建选型 | `discover_create_options`, `list_flavors` | READ |
 | 创建实例 | `create_instance` | WRITE/计费 |
 | 查询包周期订单 | `get_order` | READ |
+| 确认付款 | `pay_order` | DANGEROUS/实际扣款 |
 | 取消待支付订单 | `cancel_order` | DANGEROUS |
 | 规格与容量 | `resize_instance`, `expand_instance` | WRITE/可能中断或计费 |
 | 重启 | `restart_instance` | WRITE/中断连接 |

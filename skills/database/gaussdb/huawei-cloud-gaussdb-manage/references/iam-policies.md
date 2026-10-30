@@ -59,6 +59,9 @@ GaussDB 是区域级服务。应在目标区域项目中授权，并按实际启
 [订单详情](https://support.huaweicloud.com/api-oce/api_order_00014.html)和
 [取消待支付订单](https://support.huaweicloud.com/api-oce/api_order_00017.html)。
 不要因 GaussDB 读写权限正常就假设拥有 BSS 权限；本服务不会自动提权。
+`pay_order` 另需身份策略 `billing:order:pay`，角色/策略模式按对应 BSS 支付权限配置。
+参见 [支付订单](https://support.huaweicloud.com/api-oce/api_order_00030.html)。
+付款是实际扣款操作，测试工具注册或护栏不代表已授权执行真实付款。
 默认 BSS 地址为中国站 `https://bss.myhuaweicloud.com`；其他站点需设置
 `HUAWEICLOUD_BSS_ENDPOINT`。沿用现有 AK/SK/STS，BSS 不使用数据库区域的 Project ID。
 

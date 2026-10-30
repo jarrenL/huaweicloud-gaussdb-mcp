@@ -1050,6 +1050,7 @@ class GaussDBService:
             hints.append(
                 "Call get_order with order_id to check billing status and the actual amount. "
                 "An unpaid order does not mean an instance has been provisioned. "
+                "After approval for the exact amount and currency, use pay_order. "
                 "To abandon an unpaid order, use cancel_order after confirmation."
             )
         if payload.get("job_id"):

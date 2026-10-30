@@ -35,7 +35,7 @@
 
 ## BSS 查询流程
 
-GaussDB MCP 的 BSS 客户端仅用于已有订单查询与取消。购买前询价、余额和支付仍需使用
+GaussDB MCP 的 BSS 客户端覆盖已有订单查询、确认付款与取消。购买前询价和余额仍需使用
 独立的华为云计费/BSS 工具、API Explorer 或受控的 BSS SDK/CLI，不能把 GaussDB OpenAPI
 调用通道用于 BSS 请求。`get_order` 可查看下单后的金额，不替代购买前报价。
 

@@ -1,4 +1,4 @@
-"""GaussDB customer-order details and unpaid-order cancellation tools."""
+"""GaussDB order details, confirmed payment and unpaid-order cancellation tools."""
 
 from typing import Any
 
@@ -6,6 +6,35 @@ from huaweicloud_mcp_core import ToolRisk, guard
 
 from ..server import mcp
 from ..service.billing_service import BillingService
+
+
+@mcp.tool()
+@guard(risk=ToolRisk.DANGEROUS)
+async def pay_order(
+    order_id: str, expected_amount: str, currency: str, confirm: bool = False
+) -> dict[str, Any]:
+    """Pay one pending GaussDB order from the account balance after explicit cost approval.
+
+    Scenario: get_order returned an unpaid yearly/monthly order. Obtain approval for its exact
+    ID, amount and currency. This submits a real payment; confirm is not proof of human approval.
+
+    Args:
+        order_id: Exact GaussDB order ID from create_instance/get_order, at most 64 characters.
+        expected_amount: Approved decimal amount as a string, e.g. '1248.00'. Must match both
+            official_amount and amount_after_discount; discounted orders are rejected to avoid
+            losing a discount. This tool does not select coupons or discounts.
+        currency: Exact three-letter currency from get_order, e.g. CNY; never infer from region.
+        confirm: True only after authorization for this order and cost; false makes no payment.
+
+    Returns:
+        Submission/verification flags and current order state; no automatic payment retries.
+        Requires billing:order:view and billing:order:pay. Rejects cancelled, protected,
+        and mixed-product orders. Already processing/completed orders are not submitted again.
+        Inspect get_order and get_instance after payment; acceptance is not provisioning success.
+    """
+    return await BillingService().pay_order(
+        order_id=order_id, expected_amount=expected_amount, currency=currency, confirm=confirm
+    )
 
 
 @mcp.tool()

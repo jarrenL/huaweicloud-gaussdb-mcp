@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.6.0`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.7.0`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -69,6 +69,7 @@ Database / cloud resource management / operations automation.
 | `discover_create_options` | Discover all cloud prerequisites and a recommended create configuration | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `create_instance` | Provision an instance | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_017.html) |
 | `get_order` | Inspect GaussDB order amounts, status and paginated line items | READ | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00014.html) |
+| `pay_order` | Confirm and pay a GaussDB order after verifying exact cost and currency | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00030.html) |
 | `cancel_order` | Recheck and cancel an unpaid GaussDB order after confirmation | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00017.html) |
 | `delete_instance` | Permanently delete an instance after confirmation and a cloud-side protection recheck | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `resize_instance`, `expand_instance`, `restart_instance` | Manage instance capacity and lifecycle | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_019.html) |
@@ -107,7 +108,25 @@ BSS uses shared hot-reloaded AK/SK/STS with global credentials. Its default Chin
 for another billing site. Details require `billing:order:view`; cancellation needs the applicable
 order-update authorization for the account's policy model (such as legacy `bss:order:update`).
 Read-only mode blocks cancellation; confirmation, resource protection and audit remain enabled.
-Payment, refunds, unsubscription and pre-purchase pricing use separate billing capabilities.
+After inspecting `get_order` and obtaining cost approval, call `pay_order` with the exact
+`order_id`, a decimal-string `expected_amount` (for example `"1248.00"`), the returned `currency`
+(for example `"CNY"`), and `confirm=true`. It checks every line and refreshes status, amount and
+protection immediately before submitting one BSS SDK payment request, without automatic retries.
+Cancelled/non-payable and mixed-product orders are rejected; processing/completed orders return
+their existing state without another payment. Payment requires `billing:order:pay` plus read access.
+BSS applies its cash/credit-account balance rules.
+
+The tool does not select coupons or additional discounts. Both `official_amount` and
+`amount_after_discount` must match the approved amount; discounted orders use the billing console
+to avoid silently losing a discount. Managed accounts may receive automatic cloud-side benefits;
+the bill determines the actual cash deduction. `expected_amount` is a preflight check, not an atomic
+charge cap, because BSS does not accept that field. Order amount changes found after submission
+produce a warning. The process serializes payments; BSS remains authoritative across processes.
+
+Check `payment_submitted` and `payment_verified`. A lost response may leave submission unknown
+(`payment_submitted=null`); inspect the same order before any retry. Payment acceptance does not mean
+the instance is ready: track `get_order`, then verify `get_instance`. Refunds, unsubscription and
+pre-purchase pricing use separate billing capabilities.
 `confirm=true` is a tool argument, not server-verified human approval; the agent client owns its UI.
 
 ### CES monitoring
@@ -133,7 +152,7 @@ metrics at runtime for each instance; the reference is not a fixed availability 
 
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.6.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.7.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
 

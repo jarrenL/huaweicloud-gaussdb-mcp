@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.6.0`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.7.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -59,6 +59,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 - 通过 CES 实时发现和批量查询实例、节点及组件监控指标。
 - 通过 BSS SDK 查询 GaussDB 包周期订单金额、状态和明细，确认后取消待支付订单。
+- 核对订单金额和币种后，通过 BSS SDK 确认余额支付，并复查付款状态。
 
 ## 可用工具
 
@@ -70,6 +71,7 @@ uvx mcp-server-huaweicloud-gaussdb
 | `discover_create_options` | 自动发现创建实例所需的全部云端参数并给出推荐配置 | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `create_instance` | 创建 GaussDB 实例 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_017.html) |
 | `get_order` | 查询 GaussDB 订单状态、金额和分页明细 | READ | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00014.html) |
+| `pay_order` | 核对准确金额、币种并确认支付 GaussDB 订单 | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00030.html) |
 | `cancel_order` | 取消待支付 GaussDB 订单；确认、保护检查并复查状态 | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00017.html) |
 | `delete_instance` | 永久删除实例；强制确认并二次检查云端保护属性 | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
 | `resize_instance` | 变更 CPU/内存规格 | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
@@ -123,7 +125,33 @@ uvx mcp-server-huaweicloud-gaussdb
 账号所用授权模型核对 [BSS 权限说明](https://support.huaweicloud.com/api-oce/api_order_00017.html)
 （角色/策略授权可能涉及 `bss:order:update`）。只读模式拦截取消，危险操作需要确认并写入审计。
 
-支付、退款、资源退订及购买前询价需使用独立的计费能力。`confirm=true` 是调用参数，
+付款前先用 `get_order` 核对准确订单并取得用户对金额和币种的授权，然后调用：
+
+```json
+{
+  "order_id": "<订单号>",
+  "expected_amount": "1248.00",
+  "currency": "CNY",
+  "confirm": true
+}
+```
+
+上述对象是 `pay_order` 的调用参数，金额和币种应采用当前订单的实际值，金额使用十进制字符串。
+服务核验全部明细并在付款前刷新状态、金额与保护属性，仅提交一次付款请求，不自动重试；
+已取消、非待支付或混合产品订单被拒绝，处理中/已完成订单直接返回当前状态。
+付款需要 `billing:order:pay` 及订单读取权限，使用账号余额（现金或信用账户由云端规则决定）。
+
+当前工具不主动选择优惠券或额外折扣，要求 `official_amount` 与 `amount_after_discount`
+同时等于确认金额；两者不同会拒绝付款，避免丢失优惠。需要券/折扣的订单请在费用中心完成。
+托管账户可能由云端自动使用优惠，最终现金扣款以账单为准。`expected_amount` 是提交前核对值，
+BSS 付款接口不接收该字段，因此它不构成原子扣款上限。
+
+付款返回 `payment_submitted` 与 `payment_verified`。超时等异常可能使提交结果未知
+（`payment_submitted=null`），此时先查询同一订单，不自动再次付款。复查发现订单金额与授权
+不同会返回告警。当前进程串行处理付款请求；跨进程和重启后的状态以 BSS 为准。
+付款受理不等于实例开通；继续查询 `get_order`，再用 `get_instance` 确认实例状态。
+
+退款、资源退订及购买前询价需使用独立的计费能力。`confirm=true` 是调用参数，
 不等于服务端核验过人工审批；具体确认界面由 Agent 客户端实现。
 
 ### CES 监控
@@ -147,7 +175,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.6.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.7.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。

@@ -58,7 +58,7 @@ uv sync --directory server/mcp_server_gaussdb --frozen
 uv run --directory server/mcp_server_gaussdb mcp_server_gaussdb
 ```
 
-通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 27 个
+通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 28 个
 工具，包含 `discover_create_options`、`update_instance_parameters`、
 `describe_openapi_operation` 和 `invoke_dangerous_openapi`。新增兼容工具不应导致验证失败。
 

@@ -27,6 +27,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 MINIMUM_TOOLS = {
+    "pay_order",
     "get_order",
     "cancel_order",
     "list_instances",

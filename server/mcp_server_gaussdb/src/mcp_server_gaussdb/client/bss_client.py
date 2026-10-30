@@ -26,6 +26,8 @@ class BssOrderClient:
 
         config = HttpConfig.get_default_config()
         config.timeout = 60
+        # Payment submission must never be retried automatically after an ambiguous failure.
+        config.retry_times = 0
         self._client = (
             BssClient.new_builder()
             .with_credentials(build_credentials(CredentialScope.GLOBAL, self._settings))
@@ -45,9 +47,10 @@ class BssOrderClient:
                     wrapped.message,
                     request_id=wrapped.request_id,
                     hint="Check the customer account, BSS endpoint and billing permissions. "
-                    "Order details require billing:order:view; cancellation also needs the "
+                    "Order details require billing:order:view; payment requires billing:order:pay. "
+                    "Cancellation also needs the "
                     "applicable BSS order-update permission under your authorization model. "
-                    "Only pending-payment orders can be cancelled. "
+                    "Only pending-payment orders can be paid or cancelled. "
                     "Query get_order before retrying.",
                 ) from exc
 
@@ -69,4 +72,18 @@ class BssOrderClient:
         return await self._call(
             "cancel_customer_order",
             CancelCustomerOrderRequest(body=CancelCustomerOrderReq(order_id=order_id)),
+        )
+
+    async def pay_order(self, *, order_id: str) -> dict[str, Any]:
+        from huaweicloudsdkbss.v2 import PayCustomerOrderV3Req, PayOrdersRequest
+
+        return await self._call(
+            "pay_orders",
+            PayOrdersRequest(
+                body=PayCustomerOrderV3Req(
+                    order_id=order_id,
+                    use_coupon="NO",
+                    use_discount="NO",
+                )
+            ),
         )
