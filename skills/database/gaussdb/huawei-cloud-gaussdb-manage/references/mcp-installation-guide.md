@@ -3,7 +3,7 @@
 ## 概述
 
 本文用于安装 `mcp-server-huaweicloud-gaussdb`、把它注册到 MCP 客户端，并验证凭证读取。
-当前 Skill 要求 MCP Server 不低于 `0.7.0`、Python 3.10+ 和 MCP Python SDK 2.x。运行时
+当前 Skill 要求 MCP Server 不低于 `0.8.0`、Python 3.10+ 和 MCP Python SDK 2.x。运行时
 `initialize` 与 `tools/list` 是版本和能力的权威来源。
 
 ## 安装方式
@@ -40,8 +40,8 @@ MCP 客户端使用绝对路径注册：
 
 ### 从 PyPI 使用 UVX（发布后）
 
-只有 PyPI 已同时发布 `huaweicloud-mcp-core>=1.2.0,<2` 和
-`mcp-server-huaweicloud-gaussdb>=0.7.0,<1` 时，下面的命令才可直接使用：
+只有 PyPI 已同时发布 `huaweicloud-mcp-core>=1.3.0,<2` 和
+`mcp-server-huaweicloud-gaussdb>=0.8.0,<1` 时，下面的命令才可直接使用：
 
 ```bash
 uvx mcp-server-huaweicloud-gaussdb
@@ -51,7 +51,7 @@ uvx mcp-server-huaweicloud-gaussdb
 
 ## 凭证配置
 
-凭证按字段使用以下优先级：
+凭证按以下优先级成套选择 AK/SK/STS Token；某来源不完整时不得拼接其他来源。Region 可独立覆盖：
 
 1. `HUAWEICLOUD_ACCESS_KEY`、`HUAWEICLOUD_SECRET_KEY`、
    `HUAWEICLOUD_SECURITY_TOKEN`、`HUAWEICLOUD_REGION`。
@@ -109,3 +109,5 @@ MCP 自管凭证文件在 Linux/macOS 上必须是普通文件且权限为 `0600
 
 如果返回 `MCP_CREDENTIAL_ERROR`，只检查凭证来源是否存在、字段名、region 和文件权限，不输出
 任何凭证值。如果返回权限错误，按 `iam-policies.md` 补充最小权限后再验证。
+
+HTTP 默认仅监听 `127.0.0.1`。绑定非回环地址需配置至少 32 字符的 `HUAWEICLOUD_MCP_HTTP_TOKEN`、精确的 `MCP_SERVER_ALLOWED_HOSTS`；浏览器接入需配置 `MCP_SERVER_ALLOWED_ORIGINS`。客户端每次请求携带 `Authorization: Bearer <token>`，远程流量经 HTTPS 网关转发。这是接入 Token 校验，不是 OAuth 授权服务器。

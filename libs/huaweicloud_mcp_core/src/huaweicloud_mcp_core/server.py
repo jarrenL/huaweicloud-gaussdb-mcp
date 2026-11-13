@@ -51,11 +51,16 @@ def run_standard(server: MCPServer, service_name: str) -> None:
     )
     args = parser.parse_args()
     if args.transport == "streamable-http":
+        import uvicorn
+
+        from huaweicloud_mcp_core.http_security import secure_http_app
+
         settings = McpSettings.from_env(require_credentials=False)
-        server.run(
-            transport="streamable-http",
+        uvicorn.run(
+            secure_http_app(server, settings),
             host=settings.server_host,
             port=settings.server_port,
+            proxy_headers=False,
         )
     else:
         server.run(transport=args.transport)

@@ -1,6 +1,5 @@
 """Thin asynchronous SDK wrapper for customer billing order APIs."""
 
-import asyncio
 import os
 from typing import Any, cast
 
@@ -9,6 +8,7 @@ from huaweicloud_mcp_core import (
     McpSettings,
     McpToolError,
     build_credentials,
+    run_sdk_call,
     wrap_sdk_error,
 )
 
@@ -18,14 +18,16 @@ from .gaussdb_client import sdk_to_dict
 class BssOrderClient:
     def __init__(self, settings: McpSettings | None = None, sdk_client: Any = None) -> None:
         self._settings = settings or McpSettings.from_env()
-        if sdk_client is not None:
-            self._client = sdk_client
-            return
+        self._client = sdk_client
+
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
         from huaweicloudsdkbss.v2 import BssClient
         from huaweicloudsdkcore.http.http_config import HttpConfig
 
         config = HttpConfig.get_default_config()
-        config.timeout = 60
+        config.timeout = (10, 30)
         # Payment submission must never be retried automatically after an ambiguous failure.
         config.retry_times = 0
         self._client = (
@@ -36,10 +38,14 @@ class BssOrderClient:
             .build()
         )
 
+        return self._client
+
     async def _call(self, method: str, request: Any) -> dict[str, Any]:
         def invoke() -> dict[str, Any]:
             try:
-                return cast(dict[str, Any], sdk_to_dict(getattr(self._client, method)(request)))
+                return cast(
+                    dict[str, Any], sdk_to_dict(getattr(self._get_client(), method)(request))
+                )
             except Exception as exc:
                 wrapped = wrap_sdk_error(exc)
                 raise McpToolError(
@@ -54,7 +60,7 @@ class BssOrderClient:
                     "Query get_order before retrying.",
                 ) from exc
 
-        return await asyncio.to_thread(invoke)
+        return await run_sdk_call(invoke, read_only=method == "show_customer_order_details")
 
     async def get_order(self, *, order_id: str, limit: int, offset: int) -> dict[str, Any]:
         from huaweicloudsdkbss.v2 import ShowCustomerOrderDetailsRequest

@@ -367,12 +367,12 @@ def test_client_reuses_project_credentials_and_uses_a_separate_ces_endpoint(
     monkeypatch.setenv("HUAWEICLOUD_ENDPOINT", "https://gaussdb.example.invalid")
     if endpoint:
         monkeypatch.setenv("HUAWEICLOUD_CES_ENDPOINT", endpoint)
-    CesMonitoringClient(replace(settings, security_token="sts-monitoring"))
+    CesMonitoringClient(replace(settings, security_token="sts-monitoring"))._get_client()
     assert captured["endpoint"] == (endpoint or "https://ces.cn-north-4.myhuaweicloud.com")
     assert captured["credentials"].project_id == settings.project_id
     assert captured["credentials"].ak == settings.access_key
     assert captured["credentials"].security_token == "sts-monitoring"
-    assert captured["timeout"] == 60
+    assert captured["timeout"] == (10, 30)
 
 
 async def test_monitoring_client_is_lazy_and_default_uses_current_credentials(

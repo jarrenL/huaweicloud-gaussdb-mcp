@@ -13,6 +13,7 @@ from huaweicloud_mcp_core.credentials import (
 )
 from huaweicloud_mcp_core.errors import McpToolError, wrap_sdk_error
 from huaweicloud_mcp_core.output import clamp_limit, page_result, single_result
+from huaweicloud_mcp_core.runtime import run_sdk_call
 from huaweicloud_mcp_core.security import ToolRisk, guard
 from huaweicloud_mcp_core.server import build_server, run_standard
 
@@ -29,6 +30,7 @@ __all__ = [
     "page_result",
     "resolve_project_context",
     "resolve_project_id",
+    "run_sdk_call",
     "run_standard",
     "single_result",
     "wrap_sdk_error",

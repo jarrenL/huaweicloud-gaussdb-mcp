@@ -53,6 +53,10 @@ class _FakeIamClient:
         self.endpoint = endpoint
         return self
 
+    def with_http_config(self, config: Any) -> _FakeIamClient:
+        assert config.timeout == (10, 30) and config.retry_times == 0
+        return self
+
     def build(self) -> _FakeIamClient:
         return self
 

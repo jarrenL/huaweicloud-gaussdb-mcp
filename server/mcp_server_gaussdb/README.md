@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.7.0`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.8.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -175,7 +175,7 @@ BSS 付款接口不接收该字段，因此它不构成原子扣款上限。
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.7.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.8.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
@@ -312,11 +312,11 @@ Python 服务使用 UVX/PIP 发布链路，不额外维护功能重复的 NPX �
 | `HUAWEICLOUD_MCP_PROTECTED_NAMES` | 否 | 逗号分隔的保护资源名称 |
 | `HUAWEICLOUD_MCP_PROTECTED_TAGS` | 否 | 逗号分隔的保护标签，如 `environment=production` |
 | `HUAWEICLOUD_MCP_AUDIT_FILE` | 否 | JSONL 审计文件路径；审计始终写入 stderr |
-| `MCP_SERVER_HOST` | 否 | HTTP 监听地址，默认 `0.0.0.0` |
+| `MCP_SERVER_HOST` | 否 | HTTP 监听地址，默认 `127.0.0.1` |
 | `MCP_SERVER_PORT` | 否 | HTTP 端口，默认 `8000` |
 
-`*` 可由显式环境变量、MCP 凭证文件或 devkit S1 提供。读取优先级按字段为：环境变量、
-MCP 凭证文件、devkit S1。`project_id` 和 `domain_id` 不从 devkit 读取；未显式设置
+`*` 可由显式环境变量、MCP 凭证文件或 devkit S1 提供。凭证来源优先级为：环境变量、
+MCP 凭证文件、devkit S1。AK/SK/可选 STS Token 成套读取，不完整时报错，Region 可独立覆盖。`project_id` 和 `domain_id` 不从 devkit 读取；未显式设置
 `project_id` 时继续通过 IAM 按区域自动发现。
 
 ### 复用 huaweicloud-devkit 凭证
@@ -378,7 +378,7 @@ AgentArts 支持 UVX stdio 和 Streamable HTTP；平台说明见[自定义接入
 mcp-server-huaweicloud-gaussdb -t streamable-http
 ```
 
-默认 MCP 地址为 `http://<host>:8000/mcp`。远程服务需要可被 AgentArts 访问，生产部署应在前置网关配置 HTTPS 和客户端鉴权。仓库中的 `examples/agentarts-*.json` 可作为码道 MCP 市场、AgentArts 和 OfficeACE 连接器上架配置的基线。
+默认仅本机访问 `http://127.0.0.1:8000/mcp`。远程服务需要可被 AgentArts 访问，生产部署应在前置网关配置 HTTPS 和客户端鉴权。仓库中的 `examples/agentarts-*.json` 可作为码道 MCP 市场、AgentArts 和 OfficeACE 连接器上架配置的基线。
 
 ## 示例
 
@@ -430,3 +430,7 @@ uv build --directory server/mcp_server_gaussdb
 ## 许可证
 
 Apache License 2.0。
+
+### 安全与可靠性
+
+版本 0.8.0 的凭证成套选择、接口审核、变更保护、异常脱敏、审计容量及 HTTP 接入要求见 [安全与可靠性说明](SECURITY.md)。

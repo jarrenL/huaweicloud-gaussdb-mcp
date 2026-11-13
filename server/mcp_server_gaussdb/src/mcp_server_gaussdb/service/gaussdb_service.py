@@ -12,6 +12,7 @@ from huaweicloud_mcp_core import (
     clamp_limit,
     page_result,
     resolve_project_context,
+    run_sdk_call,
     single_result,
 )
 from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
@@ -19,6 +20,7 @@ from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
 from ..client.gaussdb_client import GaussDBClient
 from ..client.vpc_client import VpcResourceClient
 from .time_utils import normalize_time_ms
+from .write_safety import require_manual_payment
 
 _INSTANCE_FIELDS = (
     "id",
@@ -306,7 +308,7 @@ class GaussDBService:
         page_size = clamp_limit(limit)
         network = self._network_client or VpcResourceClient(self._settings)
         context, datastores, flavors, vpcs, subnets, security_groups = await asyncio.gather(
-            asyncio.to_thread(resolve_project_context, self._settings),
+            run_sdk_call(lambda: resolve_project_context(self._settings), read_only=True),
             self._client.list_datastores(),
             self._client.list_flavors_details(
                 # Fetch the full API page for availability decisions. The caller's limit only
@@ -828,6 +830,7 @@ class GaussDBService:
         return page_result(items, total=total, marker=_next_marker(offset, len(items), total))
 
     async def create_instance(self, *, configuration: dict[str, Any]) -> dict[str, Any]:
+        require_manual_payment(configuration)
         required = {
             "name",
             "datastore",
@@ -1006,12 +1009,16 @@ class GaussDBService:
 
         charge = body.get("charge_info")
         if charge:
+            charge = dict(charge)
+            body["charge_info"] = charge
             charge_mode = charge.get("charge_mode")
             if charge_mode not in {"postPaid", "prePaid"}:
                 raise McpToolError(
                     "MCP_INVALID_ARGS", "charge_info.charge_mode must be postPaid or prePaid."
                 )
             if charge_mode == "prePaid":
+                charge.setdefault("is_auto_pay", "false")
+                charge.setdefault("is_auto_renew", "false")
                 period_type = charge.get("period_type")
                 period_num = int(charge.get("period_num") or 0)
                 valid_period = (period_type == "month" and 1 <= period_num <= 9) or (
@@ -1129,6 +1136,7 @@ class GaussDBService:
     async def resize_instance(
         self, *, instance_id: str, flavor_ref: str, is_auto_pay: bool = False
     ) -> dict[str, Any]:
+        require_manual_payment({"is_auto_pay": is_auto_pay})
         response = await self._client.resize_instances_flavor(
             instance_id=instance_id, flavor_ref=flavor_ref, is_auto_pay=is_auto_pay
         )
@@ -1148,6 +1156,7 @@ class GaussDBService:
         dn_shard_count: int | None = None,
         is_auto_pay: bool = False,
     ) -> dict[str, Any]:
+        require_manual_payment({"is_auto_pay": is_auto_pay})
         selected = sum(
             value is not None and value != []
             for value in (new_volume_size_gb, coordinator_az_codes, dn_shard_count)

@@ -31,3 +31,5 @@ def main() -> None:
 See `docs/development/` in the repository root for the full specification.
 
 Version 1.2.0 compatibility and credential configuration: [migration notes](../../docs/development/core-1.2-migration.md).
+
+Version 1.3.0 keeps the existing credential sources and public helpers. AK/SK/STS are selected atomically; partial identities fail closed. HTTP defaults to loopback and public binds require a separate MCP access token plus Host allowlist. Error responses are masked and marked as errors, auditing is bounded/rotated, and `run_sdk_call` provides bounded SDK workers without automatic write retries. See the [GaussDB deployment notes](../../server/mcp_server_gaussdb/SECURITY.md) for settings and migration details.

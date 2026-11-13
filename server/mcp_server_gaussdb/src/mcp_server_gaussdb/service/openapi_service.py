@@ -3,13 +3,23 @@
 from typing import Any
 
 from huaweicloud_mcp_core import McpToolError, ToolRisk, clamp_limit, page_result, single_result
-from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
+from huaweicloud_mcp_core.guardrails.protect import extract_tag_set, match_resource
 
 from ..client.gaussdb_client import GaussDBClient
 from ..openapi_catalog import get_operation, operation_schema, operations
+from .write_safety import require_manual_payment
 
 _DEDICATED_TOOL_ONLY = {
     "update_instance_configuration": "update_instance_parameters",
+    **dict.fromkeys(
+        (
+            "create_database_instance",
+            "create_db_instance",
+            "create_gauss_db_instance",
+            "create_instance",
+        ),
+        "create_instance",
+    ),
 }
 _REQUEST_SHAPE_GUIDANCE: dict[str, dict[str, Any]] = {
     "add_instance_tags": {
@@ -47,10 +57,12 @@ _REQUEST_SHAPE_GUIDANCE: dict[str, dict[str, Any]] = {
 def _with_invocation_guidance(summary: dict[str, Any]) -> dict[str, Any]:
     operation = str(summary["operation"])
     dedicated_tool = _DEDICATED_TOOL_ONLY.get(operation)
+    metadata = get_operation(operation)
     return {
         **summary,
         "operation_naming": "snake_case",
-        "direct_invoke_supported": dedicated_tool is None,
+        "reviewed": bool(metadata and metadata.reviewed),
+        "direct_invoke_supported": dedicated_tool is None and bool(metadata and metadata.reviewed),
         **({"dedicated_tool": dedicated_tool} if dedicated_tool else {}),
         **_REQUEST_SHAPE_GUIDANCE.get(operation, {}),
     }
@@ -118,7 +130,12 @@ class OpenApiService:
         )
 
     async def invoke(
-        self, *, operation: str, request: dict[str, Any], required_risk: ToolRisk
+        self,
+        *,
+        operation: str,
+        request: dict[str, Any],
+        required_risk: ToolRisk,
+        confirm: bool = False,
     ) -> dict[str, Any]:
         metadata = get_operation(operation)
         if metadata is None:
@@ -129,6 +146,12 @@ class OpenApiService:
                     "Use list_openapi_operations and pass its exact snake_case operation value in "
                     "the operation field."
                 ),
+            )
+        if not metadata.reviewed:
+            raise McpToolError(
+                "MCP_UNREVIEWED_OPERATION",
+                "This SDK operation has not passed the MCP risk-policy review.",
+                hint="Install a release whose reviewed policy includes this operation.",
             )
         if operation in _DEDICATED_TOOL_ONLY:
             dedicated_tool = _DEDICATED_TOOL_ONLY[operation]
@@ -157,16 +180,10 @@ class OpenApiService:
                 f"{required_risk.value}.",
                 hint=f"Use invoke_{metadata.risk.value.lower()}_openapi for this operation.",
             )
-        if required_risk is ToolRisk.DANGEROUS and request.get("instance_id"):
-            lookup = await self._client.list_database_instances(
-                limit=1,
-                offset=0,
-                instance_id=str(request["instance_id"]),
-                name=None,
-            )
-            instances = lookup.get("instances") or []
-            if instances:
-                assert_not_protected(instances[0], tool_name="invoke_dangerous_openapi")
+        warnings: list[dict[str, str]] = []
+        if required_risk is not ToolRisk.READ:
+            require_manual_payment(request)
+            warnings = await self._protect_targets(request, required_risk, confirm, operation)
         try:
             response = await self._client.invoke_openapi(operation=operation, request=request)
         except ValueError as exc:
@@ -188,7 +205,106 @@ class OpenApiService:
                 "Huawei Cloud VPC/EIP service first when needed, then verify the binding with "
                 "list_binded_eips."
             )
-        return single_result(
+        result = single_result(
             {"operation": operation, "risk": metadata.risk.value, "result": response},
             hints,
         )
+        if warnings:
+            result["warnings"] = warnings
+        return result
+
+    async def _protect_targets(
+        self, request: dict[str, Any], risk: ToolRisk, confirm: bool = False, operation: str = ""
+    ) -> list[dict[str, str]]:
+        from huaweicloud_mcp_core.guardrails.rules import Rule, load_rules
+
+        targets: set[str] = set()
+
+        def visit(value: Any, parent: str = "") -> None:
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    normalized = str(key).replace("-", "_").lower()
+                    if normalized in {
+                        "instance_id",
+                        "instanceid",
+                        "instance_ids",
+                        "instanceids",
+                        "source_instance_id",
+                        "target_instance_id",
+                    }:
+                        if isinstance(item, str):
+                            targets.add(item)
+                        elif isinstance(item, list) and all(isinstance(i, str) for i in item):
+                            targets.update(item)
+                        else:
+                            raise McpToolError("MCP_INVALID_ARGS", "Instance IDs must be strings.")
+                    elif (
+                        normalized == "id"
+                        and parent in {"instances", "instance"}
+                        and isinstance(item, str)
+                    ):
+                        targets.add(item)
+                    visit(item, normalized)
+            elif isinstance(value, list):
+                for item in value:
+                    visit(item, parent)
+
+        visit(request)
+        if len(targets) > 100:
+            raise McpToolError("MCP_INVALID_ARGS", "At most 100 target instances are allowed.")
+        tool_name = f"invoke_{risk.value.lower()}_openapi"
+        rules = [
+            rule
+            for rule in load_rules()
+            if rule.matches_tool(tool_name, risk)
+            or (operation and rule.matches_tool(operation, risk))
+        ]
+        warnings: list[dict[str, str]] = []
+
+        def apply_rule(rule: Rule) -> None:
+            if rule.action == "warn":
+                warnings.append({"rule_id": rule.id, "message": rule.message or rule.id})
+            elif rule.action == "confirm" and confirm:
+                return
+            else:
+                raise McpToolError(
+                    "MCP_CONFIRMATION_REQUIRED"
+                    if rule.action == "confirm"
+                    else "MCP_GUARDRAIL_BLOCKED",
+                    rule.message or f"Target matches resource rule '{rule.id}'.",
+                    hint="Review the actual resource and call with confirm=true."
+                    if rule.action == "confirm"
+                    else "Request a protection-rule exemption.",
+                )
+
+        for rule in rules:
+            if rule.resources.is_empty():
+                apply_rule(rule)
+        if not targets and any(
+            not rule.resources.is_empty() and rule.action != "warn" for rule in rules
+        ):
+            raise McpToolError(
+                "MCP_GUARDRAIL_BLOCKED",
+                "Cannot verify live name/tag protection without a resolvable instance target.",
+                hint="Use a dedicated scenario tool or an operation with explicit instance IDs.",
+            )
+        for instance_id in sorted(targets):
+            lookup = await self._client.list_database_instances(
+                limit=1, offset=0, instance_id=instance_id, name=None
+            )
+            instances = lookup.get("instances") or []
+            if not instances or instances[0].get("id") != instance_id:
+                raise McpToolError(
+                    "MCP_NOT_FOUND", "Cannot verify the target instance before writing."
+                )
+            resource = instances[0]
+            for rule in rules:
+                if not match_resource(
+                    rule.resources,
+                    resource_id=instance_id,
+                    name=resource.get("name"),
+                    tags=extract_tag_set(resource.get("tags") or {}),
+                ):
+                    continue
+                apply_rule(rule)
+        return warnings

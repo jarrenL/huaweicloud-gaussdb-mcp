@@ -1,12 +1,12 @@
 """Thin asynchronous wrapper around GaussDBforopenGauss SDK v3."""
 
-import asyncio
 from typing import Any, cast
 
 from huaweicloud_mcp_core import (
     CredentialScope,
     McpSettings,
     build_credentials,
+    run_sdk_call,
     wrap_sdk_error,
 )
 
@@ -55,9 +55,11 @@ def _model_from_dict(module: Any, model: type[Any], values: dict[str, Any]) -> A
 class GaussDBClient:
     def __init__(self, settings: McpSettings | None = None, sdk_client: Any = None) -> None:
         self._settings = settings or McpSettings.from_env()
-        if sdk_client is not None:
-            self._client = sdk_client
-            return
+        self._client = sdk_client
+
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
         from huaweicloudsdkcore.http.http_config import HttpConfig
         from huaweicloudsdkgaussdbforopengauss.v3 import GaussDBforopenGaussClient
 
@@ -65,7 +67,8 @@ class GaussDBClient:
             f"https://gaussdb-opengauss.{self._settings.region}.myhuaweicloud.com"
         )
         config = HttpConfig.get_default_config()
-        config.timeout = 60
+        config.timeout = (10, 30)
+        config.retry_times = 0
         self._client = (
             GaussDBforopenGaussClient.new_builder()
             .with_credentials(build_credentials(CredentialScope.PROJECT, self._settings))
@@ -74,14 +77,22 @@ class GaussDBClient:
             .build()
         )
 
+        return self._client
+
     async def _call(self, method: str, request: Any) -> dict[str, Any]:
         def invoke() -> dict[str, Any]:
             try:
-                return cast(dict[str, Any], sdk_to_dict(getattr(self._client, method)(request)))
+                return cast(
+                    dict[str, Any], sdk_to_dict(getattr(self._get_client(), method)(request))
+                )
             except Exception as exc:
                 raise wrap_sdk_error(exc) from exc
 
-        return await asyncio.to_thread(invoke)
+        from huaweicloud_mcp_core import ToolRisk
+
+        from ..operation_policy import REVIEWED_RISKS
+
+        return await run_sdk_call(invoke, read_only=REVIEWED_RISKS.get(method) is ToolRisk.READ)
 
     async def invoke_openapi(self, *, operation: str, request: dict[str, Any]) -> dict[str, Any]:
         import huaweicloudsdkgaussdbforopengauss.v3 as sdk
@@ -231,24 +242,25 @@ class GaussDBClient:
         )
 
         request = ShowInstanceConfigurationRequest(x_language="zh-cn", instance_id=instance_id)
-        if not isinstance(self._client, GaussDBforopenGaussClient):
+        if self._client is not None and not isinstance(self._client, GaussDBforopenGaussClient):
             response = await self._call("show_instance_configuration", request)
             response["_metadata_api_version"] = "sdk-default-v3"
             return response
 
         def invoke_v32() -> dict[str, Any]:
             try:
-                http_info = self._client._show_instance_configuration_http_info(request)
+                sdk_client = self._get_client()
+                http_info = sdk_client._show_instance_configuration_http_info(request)
                 http_info["resource_path"] = (
                     "/v3.2/{project_id}/instances/{instance_id}/configurations"
                 )
-                response = sdk_to_dict(self._client._call_api(**http_info))
+                response = sdk_to_dict(sdk_client._call_api(**http_info))
                 response["_metadata_api_version"] = "v3.2"
                 return cast(dict[str, Any], response)
             except Exception as exc:
                 raise wrap_sdk_error(exc) from exc
 
-        return await asyncio.to_thread(invoke_v32)
+        return await run_sdk_call(invoke_v32, read_only=True)
 
     async def update_instance_configuration(
         self, *, instance_id: str, values: dict[str, str]

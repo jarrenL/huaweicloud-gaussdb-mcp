@@ -66,6 +66,16 @@ def _value(value: Any) -> str | None:
 
 def read_credential_sources() -> tuple[dict[str, Any], dict[str, Any]]:
     """Return the MCP file and optional devkit S1 fallback for this settings snapshot."""
+    env_auth = any(
+        _value(os.getenv(key))
+        for key in (
+            "HUAWEICLOUD_ACCESS_KEY",
+            "HUAWEICLOUD_SECRET_KEY",
+            "HUAWEICLOUD_SECURITY_TOKEN",
+        )
+    )
+    if env_auth and _value(os.getenv("HUAWEICLOUD_REGION")):
+        return {}, {}
     credential_file = os.getenv("HUAWEICLOUD_MCP_CREDENTIALS_FILE")
     secret = _read_secret_file(credential_file) if credential_file else {}
     configured = (
@@ -78,7 +88,12 @@ def read_credential_sources() -> tuple[dict[str, Any], dict[str, Any]]:
     )
     skip = os.getenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS", "").strip().lower()
     devkit: dict[str, Any] = {}
-    if skip not in {"1", "true", "yes", "on"} and not all(configured):
+    # Region is independently overridable; never load another identity to complete a partial pair.
+    file_auth = any(secret.get(key) for key in ("access_key", "secret_key", "security_token"))
+    needs_region = not (_value(os.getenv("HUAWEICLOUD_REGION")) or _value(secret.get("region")))
+    if skip not in {"1", "true", "yes", "on"} and (
+        needs_region or (not env_auth and not file_auth and not all(configured))
+    ):
         explicit_path = os.getenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE")
         path = explicit_path or _DEFAULT_DEVKIT_CREDENTIALS_FILE
         if explicit_path or Path(path).expanduser().exists():

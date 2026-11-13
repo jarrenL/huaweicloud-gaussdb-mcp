@@ -718,7 +718,7 @@ wheels = [
 
 [[package]]
 name = "huaweicloud-mcp-core"
-version = "1.2.0"
+version = "1.3.0"
 source = { directory = "../../libs/huaweicloud_mcp_core" }
 dependencies = [
     { name = "huaweicloudsdkcore" },
@@ -731,7 +731,7 @@ dependencies = [
 requires-dist = [
     { name = "huaweicloudsdkcore", specifier = ">=3.1" },
     { name = "huaweicloudsdkiam", specifier = ">=3.1" },
-    { name = "mcp", specifier = ">=2.0" },
+    { name = "mcp", specifier = ">=2.0,<3" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 

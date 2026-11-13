@@ -176,7 +176,7 @@ async def resize_instance(
     Args:
         instance_id: Target GaussDB instance ID.
         flavor_ref: Target spec_code from list_flavors.
-        is_auto_pay: Automatically pay a periodic-instance order; default false.
+        is_auto_pay: Must be false; approve the returned order separately through pay_order.
         confirm: Set true when a guardrail rule requests explicit confirmation.
 
     Returns:
@@ -207,7 +207,7 @@ async def expand_instance(
         new_volume_size_gb: Target total storage size in GiB for storage expansion.
         coordinator_az_codes: One AZ code per new coordinator node for CN expansion.
         dn_shard_count: Number of new DN shards for shard expansion.
-        is_auto_pay: Automatically pay a periodic-instance order; default false.
+        is_auto_pay: Must be false; approve the returned order separately through pay_order.
         confirm: Set true when a guardrail rule requests explicit confirmation.
 
     Returns:

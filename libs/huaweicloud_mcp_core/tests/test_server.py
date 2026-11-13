@@ -14,6 +14,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import TextContent
 
 from huaweicloud_mcp_core.config import McpSettings
+from huaweicloud_mcp_core.errors import McpToolError
 from huaweicloud_mcp_core.security import ToolRisk, guard
 from huaweicloud_mcp_core.server import build_server
 
@@ -55,6 +56,36 @@ async def test_read_only_settings_reach_middleware() -> None:
         result = await client.call_tool("touch_widget", {"widget_id": "w-1"})
     payload = json.loads(_first_text(result))
     assert payload["error"]["code"] == "MCP_READ_ONLY"
+    assert result.is_error is True
+
+
+async def test_business_failure_is_error_and_bearer_is_masked_over_mcp() -> None:
+    server = _make_server()
+
+    @server.tool()
+    @guard(risk=ToolRisk.READ)
+    async def failing_tool() -> dict[str, Any]:
+        raise McpToolError("MCP_SDK_ERROR", "Bearer private-example")
+
+    async with Client(server) as client:
+        result = await client.call_tool("failing_tool", {})
+    assert result.is_error is True
+    assert "private-example" not in _first_text(result)
+
+
+async def test_success_masks_both_wire_text_and_structured_content() -> None:
+    server = _make_server()
+
+    @server.tool()
+    @guard(risk=ToolRisk.READ)
+    async def sensitive_response() -> dict[str, Any]:
+        return {"password": "example-private-value", "items": [{"sk": "example-sk"}]}
+
+    async with Client(server) as client:
+        result = await client.call_tool("sensitive_response", {})
+    assert not result.is_error
+    assert "example-private-value" not in _first_text(result)
+    assert "example-sk" not in str(result.structured_content)
 
 
 def test_build_server_requires_no_credentials() -> None:

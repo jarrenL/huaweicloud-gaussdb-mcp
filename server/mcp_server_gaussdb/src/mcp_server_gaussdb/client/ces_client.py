@@ -1,6 +1,5 @@
 """Thin asynchronous wrapper for read-only Cloud Eye monitoring APIs."""
 
-import asyncio
 import os
 from typing import Any, cast
 
@@ -9,6 +8,7 @@ from huaweicloud_mcp_core import (
     McpSettings,
     McpToolError,
     build_credentials,
+    run_sdk_call,
     wrap_sdk_error,
 )
 
@@ -18,15 +18,18 @@ from .gaussdb_client import sdk_to_dict
 class CesMonitoringClient:
     def __init__(self, settings: McpSettings | None = None, sdk_client: Any = None) -> None:
         self._settings = settings or McpSettings.from_env()
-        if sdk_client is not None:
-            self._client = sdk_client
-            return
+        self._client = sdk_client
+
+    def _get_client(self) -> Any:
+        if self._client is not None:
+            return self._client
         from huaweicloudsdkces.v1 import CesClient
         from huaweicloudsdkces.v1.region.ces_region import CesRegion
         from huaweicloudsdkcore.http.http_config import HttpConfig
 
         config = HttpConfig.get_default_config()
-        config.timeout = 60
+        config.timeout = (10, 30)
+        config.retry_times = 0
         builder = (
             CesClient.new_builder()
             .with_credentials(build_credentials(CredentialScope.PROJECT, self._settings))
@@ -39,10 +42,12 @@ class CesMonitoringClient:
             builder = builder.with_region(CesRegion.value_of(self._settings.region))
         self._client = builder.build()
 
+        return self._client
+
     async def _call(self, method: str, request: Any) -> dict[str, Any]:
         def invoke() -> dict[str, Any]:
             try:
-                response = getattr(self._client, method)(request)
+                response = getattr(self._get_client(), method)(request)
                 return cast(dict[str, Any], sdk_to_dict(response))
             except Exception as exc:
                 wrapped = wrap_sdk_error(exc)
@@ -57,7 +62,7 @@ class CesMonitoringClient:
                     ),
                 ) from exc
 
-        return await asyncio.to_thread(invoke)
+        return await run_sdk_call(invoke, read_only=True)
 
     async def list_metrics(
         self,

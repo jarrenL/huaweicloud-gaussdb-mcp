@@ -4,7 +4,7 @@ description: |
   通过 Huawei Cloud GaussDB MCP Server 管理 GaussDB（openGauss）控制面，完成购买前选型与询价编排、实例生命周期、备份、参数、慢 SQL、CES 监控诊断和 DN 主备切换。适用于明确要求使用 MCP 管理华为云 GaussDB 的场景。NOT for: GaussDB(for MySQL)、直接 hcloud/KooCLI 运维、Terraform 建库、库内 SQL/DDL 或通用验收手册；这些场景分别路由到 huawei-gaussdb（或 huawei-cloud-gaussdb-instance-management）、对应 IaC Skill、huaweicloud-gaussdb-data 或专门验收 Skill。
 metadata:
   tags: [huawei-cloud, gaussdb, database, mcp, operations]
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # 华为云 GaussDB 管理
@@ -60,14 +60,15 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.7.0`。以运行时
+1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.8.0`。以运行时
    `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
 3. 使用独立 IAM 用户或临时凭证，并按实际操作授予最小权限。需要的系统策略、授权项和
    权限失败处理见 [references/iam-policies.md](references/iam-policies.md)。
-4. 不要求用户在对话中粘贴 AK/SK。服务按字段依次读取显式环境变量、MCP 凭证文件、
-   `~/.config/huaweicloud/credentials.json` 中的 devkit 凭证；Project ID 缺省时由 IAM
+4. 不要求用户在对话中粘贴 AK/SK。服务按优先级从显式环境变量、MCP 凭证文件、
+   `~/.config/huaweicloud/credentials.json` 中的 devkit 凭证成套读取 AK/SK/STS Token；
+   Project ID 缺省时由 IAM
    按区域自动发现。
 5. 首次接入设置 `HUAWEICLOUD_MCP_READ_ONLY=true`，先完成只读验证。
 
@@ -249,7 +250,7 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 | 部署形态 | 创建时必需 | 由发现工具推导 | 只使用实时可用组合 |
 | 版本 | 创建/规格查询可选 | 云端返回值 | 不假设每个区域都有相同版本 |
 | 规格 | 创建/规格变更必需 | 无 | 使用实时 `spec_code`，禁止写死 |
-| 计费模式 | 创建/变更必需 | 不推断 | 包周期和自动支付必须明确授权 |
+| 计费模式 | 创建/变更必需 | 不推断 | 包周期与订单付款必须明确授权，创建时关闭自动支付 |
 | `confirm` | 受保护写操作必需 | `false` | DANGEROUS 必须为 `true`；普通写操作按护栏结果处理 |
 
 备份策略中的 `period` 是星期列表，例如 `1,3,5`；`differential_period` 是分钟间隔，只能为
@@ -315,3 +316,11 @@ OpenAPI 执行任意 SQL。找不到目标路由时，说明缺少的连接器�
 - `logger` 的查询可见不等于公开接口可以创建，禁止静默转换为 `triset`。
 - 不在 Skill、示例、日志或回复中保存真实 AK/SK、SecurityToken、数据库密码或完整慢 SQL。
 - 包周期退订、恢复、主备切换、升级和删除属于危险操作，必须核对精确资源并显式确认。
+
+## 0.8.0 安全约束
+
+- 保持环境变量 → MCP 凭证文件 → devkit S1 的优先级；AK/SK/STS Token 来自同一来源，不完整时报错。
+- `list_openapi_operations`/`describe_openapi_operation` 中 `reviewed=false` 的接口不可调用；创建实例与修改参数使用专用工具。
+- 创建、变更请求的 `is_auto_pay`、`is_auto_renew` 保持 false。获取待支付订单后，按订单、金额、币种取得用户授权，再调用 `pay_order`。`confirm=true` 本身不证明已经获得用户授权。
+- `MCP_WRITE_RESULT_UNKNOWN` 或客户端取消不代表云端写入失败；查询已有资源、任务或订单，不自动重提写操作。`MCP_BUSY` 表示容量已满，应稍后重试。
+- 有资源保护规则但通用接口无法核实目标时，停止写入，不绕过护栏。

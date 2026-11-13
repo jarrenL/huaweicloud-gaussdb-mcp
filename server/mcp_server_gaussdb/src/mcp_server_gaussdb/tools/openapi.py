@@ -93,7 +93,7 @@ async def invoke_write_openapi(
         The operation name, risk classification, and recursively converted SDK response.
     """
     return await OpenApiService().invoke(
-        operation=operation, request=request, required_risk=ToolRisk.WRITE
+        operation=operation, request=request, required_risk=ToolRisk.WRITE, confirm=confirm
     )
 
 
@@ -117,5 +117,5 @@ async def invoke_dangerous_openapi(
         The operation name, risk classification, and recursively converted SDK response.
     """
     return await OpenApiService().invoke(
-        operation=operation, request=request, required_risk=ToolRisk.DANGEROUS
+        operation=operation, request=request, required_risk=ToolRisk.DANGEROUS, confirm=confirm
     )

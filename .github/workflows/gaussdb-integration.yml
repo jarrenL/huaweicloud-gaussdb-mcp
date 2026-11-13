@@ -40,7 +40,7 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
       - run: uv run mypy src tests
-      - run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=80
+      - run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=${{ matrix.package == 'server/mcp_server_gaussdb' && 90 || 80 }}
       - run: uv build --out-dir "$RUNNER_TEMP/gaussdb-integration-build"
       - name: Validate the management Skill
         if: matrix.package == 'server/mcp_server_gaussdb'

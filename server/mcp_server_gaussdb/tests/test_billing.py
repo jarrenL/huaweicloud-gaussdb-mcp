@@ -276,7 +276,7 @@ def test_global_credentials_reuse_sts_and_ignore_gaussdb_endpoint(
 
     monkeypatch.setenv("HUAWEICLOUD_BSS_ENDPOINT", "https://bss.example.com")
     client = BssOrderClient(replace(settings, domain_id="d", security_token="sts-token"))
-    sdk = client._client
+    sdk = client._get_client()
     assert sdk.get_credentials().domain_id == "d"
     assert sdk.get_credentials().security_token == "sts-token"
 

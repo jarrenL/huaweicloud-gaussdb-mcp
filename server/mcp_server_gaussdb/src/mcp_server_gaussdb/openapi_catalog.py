@@ -10,40 +10,7 @@ from typing import Any
 
 from huaweicloud_mcp_core import ToolRisk
 
-_READ_PREFIXES = ("get_", "list_", "show_", "search_", "validate_", "export_", "download_")
-_DANGEROUS_PREFIXES = ("delete_", "shrink_", "stop_")
-_DANGEROUS_OPERATIONS = {
-    "attach_eip",
-    "batch_delete_instance_tag",
-    "bind_d_nat",
-    "cancel_schedule_task",
-    "change_demand2_period",
-    "change_deployment_solution",
-    "confirm_restored_data",
-    "create_restore_instance",
-    "execute_cross_cloud_disaster_end_simulation",
-    "execute_cross_cloud_disaster_recovery_failover",
-    "execute_cross_cloud_disaster_restore",
-    "execute_cross_cloud_disaster_switchover",
-    "execute_cross_cloud_release_disaster",
-    "modify_instance_port",
-    "modify_security_group",
-    "reset_configuration",
-    "reset_dr_config",
-    "restore_instance",
-    "restore_node_roles",
-    "switch_logger_replica",
-    "switch_logger_replica_availability_zones",
-    "switch_configuration",
-    "switch_kms_tde",
-    "switch_replica",
-    "switch_shard",
-    "unbind_lts_config",
-    "upgrade_instance_version",
-    "upgrade_instances_version",
-    "update_instance_versions",
-}
-_READ_OPERATIONS = {"batch_show_upgrade_candidate_versions"}
+from .operation_policy import REVIEWED_RISKS
 
 
 @dataclass(frozen=True)
@@ -54,6 +21,10 @@ class OpenApiOperation:
     description: str
     category: str
     risk: ToolRisk
+
+    @property
+    def reviewed(self) -> bool:
+        return self.name in REVIEWED_RISKS
 
     def summary(self) -> dict[str, str]:
         return {
@@ -71,13 +42,7 @@ def request_model_name(operation: str) -> str:
 
 
 def classify_risk(operation: str) -> ToolRisk:
-    if operation in _READ_OPERATIONS:
-        return ToolRisk.READ
-    if operation in _DANGEROUS_OPERATIONS or operation.startswith(_DANGEROUS_PREFIXES):
-        return ToolRisk.DANGEROUS
-    if operation.startswith(_READ_PREFIXES):
-        return ToolRisk.READ
-    return ToolRisk.WRITE
+    return REVIEWED_RISKS.get(operation, ToolRisk.DANGEROUS)
 
 
 def classify_category(operation: str) -> str:

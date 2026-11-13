@@ -22,7 +22,7 @@ _FIELD_KEY_MARKERS = (
 )
 
 _VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"\b[A-Z0-9]{16}\b"),
+    re.compile(r"\b(?:[A-Z0-9]{16}|[A-Z0-9]{20})\b"),
     re.compile(r"\b[A-Za-z0-9]{40}\b"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"),
     re.compile(r"Bearer\s+[A-Za-z0-9\-._~+/]+=*"),
@@ -52,7 +52,9 @@ class MaskingEngine:
         if isinstance(value, dict):
             result: dict[str, Any] = {}
             for key, item in value.items():
-                if _is_sensitive_key(str(key)):
+                if str(key).endswith("_masked") and item is True:
+                    result[str(key)] = True
+                elif _is_sensitive_key(str(key)):
                     result[str(key)] = MASK
                     result[f"{key}_masked"] = True
                 else:
@@ -65,4 +67,4 @@ class MaskingEngine:
 
 def _is_sensitive_key(key: str) -> bool:
     lowered = key.lower()
-    return any(marker in lowered for marker in _FIELD_KEY_MARKERS)
+    return lowered in {"ak", "sk"} or any(marker in lowered for marker in _FIELD_KEY_MARKERS)

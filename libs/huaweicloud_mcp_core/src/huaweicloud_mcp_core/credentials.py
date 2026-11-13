@@ -49,6 +49,7 @@ def resolve_project_context(settings: McpSettings | None = None) -> ProjectConte
     if cached:
         return cached
 
+    from huaweicloudsdkcore.http.http_config import HttpConfig
     from huaweicloudsdkiam.v3 import IamClient, KeystoneListProjectsRequest
 
     credentials = GlobalCredentials().with_ak(settings.access_key).with_sk(settings.secret_key)
@@ -58,6 +59,7 @@ def resolve_project_context(settings: McpSettings | None = None) -> ProjectConte
         IamClient.new_builder()
         .with_credentials(credentials)
         .with_endpoint(settings.iam_endpoint)
+        .with_http_config(HttpConfig(timeout=(10, 30), retry_times=0))
         .build()
     )
     try:

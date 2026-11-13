@@ -63,6 +63,9 @@ def test_bool_and_int_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HUAWEICLOUD_SECRET_KEY", "sk")
     monkeypatch.setenv("HUAWEICLOUD_REGION", "r")
     monkeypatch.setenv("HUAWEICLOUD_MCP_READ_ONLY", "nope")
+    with pytest.raises(McpToolError, match="boolean"):
+        McpSettings.from_env()
+    monkeypatch.setenv("HUAWEICLOUD_MCP_READ_ONLY", "false")
     monkeypatch.setenv("MCP_SERVER_PORT", "not-a-number")
     settings = McpSettings.from_env()
     assert settings.read_only is False

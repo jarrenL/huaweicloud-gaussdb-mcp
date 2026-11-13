@@ -64,15 +64,19 @@ def test_source_precedence_and_file_reload(tmp_path: Path, monkeypatch: pytest.M
     monkeypatch.setenv("HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE", str(devkit))
     monkeypatch.setenv("HUAWEICLOUD_MCP_CREDENTIALS_FILE", str(mcp))
     monkeypatch.setenv("HUAWEICLOUD_ACCESS_KEY", "env-a")
+    with pytest.raises(McpToolError, match="both AK and SK"):
+        McpSettings.from_env()
+    monkeypatch.setenv("HUAWEICLOUD_SECRET_KEY", "env-s")
     settings = McpSettings.from_env()
     assert (settings.access_key, settings.secret_key, settings.region) == (
         "env-a",
-        "devkit-s",
+        "env-s",
         "devkit-r",
     )
-    assert (settings.project_id, settings.domain_id) == ("pid", "did")
+    assert settings.project_id is None and settings.domain_id is None
     _write(mcp, {"access_key": "file-b", "secret_key": "file-s", "region": "file-r"})
     monkeypatch.delenv("HUAWEICLOUD_ACCESS_KEY")
+    monkeypatch.delenv("HUAWEICLOUD_SECRET_KEY")
     settings = McpSettings.from_env()
     assert (settings.access_key, settings.secret_key, settings.region) == (
         "file-b",

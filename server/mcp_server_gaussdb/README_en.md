@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: `0.7.0`; Python `3.10+`; MCP Python SDK `2.x`.
+Current version: `0.8.0`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -152,7 +152,7 @@ metrics at runtime for each instance; the reference is not a fixed availability 
 
 ### Complete OpenAPI access
 
-At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.7.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
+At startup the server discovers public request operations from the installed Huawei Cloud GaussDB SDK. Version `0.8.0` discovers 265 request operations from SDK `3.1.218`, including versioned and compatibility operations. The catalog workflow keeps hundreds of schemas out of the model's always-on tool context: search with `list_openapi_operations`, inspect the recursive request structure with `describe_openapi_operation`, then use the matching risk-specific invocation tool.
 
 The server rejects risk-lane mismatches. DANGEROUS calls always require `confirm=true`; when an `instance_id` is supplied, the server also re-reads the cloud resource and applies protected ID, name, and tag rules before invocation.
 
@@ -248,7 +248,7 @@ Source-checkout client configuration (also works with this integration branch be
 
 ## Configuration
 
-Credential values resolve per field in this order: explicit environment variables, the MCP file
+Credential identities resolve in this order: explicit environment variables, the MCP file
 named by `HUAWEICLOUD_MCP_CREDENTIALS_FILE`, then the devkit S1 file at
 `~/.config/huaweicloud/credentials.json`. The S1 keys `ak`, `sk`, `securityToken`, and `region`
 map to the corresponding MCP settings. Override its path with
@@ -284,7 +284,7 @@ AgentArts supports UVX stdio and Streamable HTTP. See [Custom MCP access](https:
 mcp-server-huaweicloud-gaussdb -t streamable-http
 ```
 
-The default endpoint is `http://<host>:8000/mcp`. Put public deployments behind HTTPS and client authentication.
+The default endpoint is `http://127.0.0.1:8000/mcp`. Put public deployments behind HTTPS and client authentication.
 
 ## Examples
 
@@ -328,3 +328,9 @@ See `CONTRIBUTING.md`, `SECURITY.md`, and `CHANGELOG.md` in the repository root.
 ## License
 
 Apache License 2.0.
+
+### Security and reliability
+
+See [security and reliability notes](SECURITY.md) for atomic credential selection, reviewed API policy, write protection, error handling, bounded auditing, SDK deadlines and HTTP access requirements in 0.8.0.
+
+AK/SK and optional STS token are selected together from one source; partial identities fail closed. Region remains independently overridable. Public HTTP binds require `HUAWEICLOUD_MCP_HTTP_TOKEN` (32+ characters) and exact `MCP_SERVER_ALLOWED_HOSTS`, with `MCP_SERVER_ALLOWED_ORIGINS` for browser callers. Send the MCP token in every Authorization Bearer header through an HTTPS gateway. This shared-token access gate is separate from cloud AK/SK and does not provide OAuth discovery or human approval. Auto-pay/auto-renew must stay disabled; use the separately approved order payment workflow.
