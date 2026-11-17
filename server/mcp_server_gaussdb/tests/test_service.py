@@ -133,9 +133,10 @@ async def test_create_instance_validation_and_region(service, fake_client) -> No
         await service.create_instance(configuration=config)
 
 
-async def test_discover_create_options(
+@pytest.fixture(name="discovery_service")
+def _discovery_fixture(
     fake_client: Any, settings: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
+) -> GaussDBService:
     class FakeNetwork:
         async def list_vpcs(self, *, limit: int) -> dict[str, Any]:
             return {"vpcs": [{"id": "v1", "name": "vpc-default", "status": "OK"}]}
@@ -192,7 +193,11 @@ async def test_discover_create_options(
         settings=settings,
         network_client=FakeNetwork(),  # type: ignore[arg-type]
     )
-    result = await service.discover_create_options()
+    return service
+
+
+async def test_discover_create_configuration(discovery_service: GaussDBService) -> None:
+    result = await discovery_service.discover_create_options()
     assert result["project"]["domain_id"] == "domain"
     assert result["recommended_configuration"]["availability_zone"] == "az1"
     assert result["recommended_configuration"]["replica_num"] == 1
@@ -208,6 +213,10 @@ async def test_discover_create_options(
         "logger",
     ]
     assert result["deployment_options"][2]["direct_create_supported"] is False
+
+
+async def test_discover_create_fields(discovery_service: GaussDBService, fake_client: Any) -> None:
+    result = await discovery_service.discover_create_options()
     assert result["create_field_options"]["ha.consistency"][1]["value"] == "eventual"
     assert result["create_field_options"]["charge_info.charge_mode"] == [
         "postPaid",
@@ -218,18 +227,26 @@ async def test_discover_create_options(
     flavor_calls = [values for name, values in fake_client.calls if name == "list_flavors_details"]
     assert flavor_calls[-1]["limit"] == 100
 
-    result = await service.discover_create_options(deployment_mode="triset")
+
+async def test_discover_centralized_deployments(discovery_service: GaussDBService) -> None:
+    result = await discovery_service.discover_create_options(deployment_mode="triset")
     assert result["recommended_configuration"]["availability_zone"] == "az1,az1,az1"
     assert result["recommended_configuration"]["replica_num"] == 3
 
-    result = await service.discover_create_options(deployment_mode="logger")
+    result = await discovery_service.discover_create_options(deployment_mode="logger")
     assert result["recommended_configuration"] is None
 
     # Legacy aliases remain accepted by the service for existing MCP clients.
-    result = await service.discover_create_options(deployment_mode="single_replica")
+    result = await discovery_service.discover_create_options(deployment_mode="single_replica")
     assert result["selection"]["deployment_mode"] == "single"
 
-    result = await service.discover_create_options(ha_mode="enterprise", product_type="basic")
+
+async def test_discover_distributed_deployments(
+    discovery_service: GaussDBService, fake_client: Any
+) -> None:
+    result = await discovery_service.discover_create_options(
+        ha_mode="enterprise", product_type="basic"
+    )
     assert result["selection"]["deployment_mode"] == "combined"
     assert result["selection"]["flavor_query_ha_mode"] == "combined"
     assert result["deployment_options"][0]["value"] == "combined"
@@ -247,15 +264,19 @@ async def test_discover_create_options(
     fake_client.responses["list_flavors_details"]["flavors"][0]["spec_code"] = (
         "gaussdb.opengauss.ee.dn.f1"
     )
-    result = await service.discover_create_options(ha_mode="enterprise", product_type="enterprise")
+    result = await discovery_service.discover_create_options(
+        ha_mode="enterprise", product_type="enterprise"
+    )
     assert result["selection"]["deployment_mode"] == "hws"
     assert result["selection"]["flavor_query_ha_mode"] == "enterprise"
     assert result["deployment_options"][0]["value"] == "hws"
 
+
+async def test_discover_rejects_invalid_options(discovery_service: GaussDBService) -> None:
     with pytest.raises(McpToolError, match="deployment_mode"):
-        await service.discover_create_options(deployment_mode="invalid")
+        await discovery_service.discover_create_options(deployment_mode="invalid")
     with pytest.raises(McpToolError, match="product_type"):
-        await service.discover_create_options(product_type="invalid")
+        await discovery_service.discover_create_options(product_type="invalid")
 
 
 async def test_distributed_create_binding_error_has_actionable_hint(service, fake_client) -> None:  # type: ignore[no-untyped-def]

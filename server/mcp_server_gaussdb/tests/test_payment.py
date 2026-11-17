@@ -56,6 +56,34 @@ async def test_payment_preview_never_sends_payment() -> None:
     assert not client.attempted
 
 
+@pytest.mark.parametrize("action", ["pay", "cancel"])
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("total_count", True),
+        ("total_count", 1.0),
+        ("total_count", "1"),
+        ("status", True),
+        ("status", 6.0),
+        ("status", "6"),
+    ],
+)
+async def test_noninteger_cloud_fields_block_billing_writes(
+    action: str, field: str, value: Any
+) -> None:
+    page = clean()
+    target = page["order_info"] if field == "status" else page
+    target[field] = value
+    client = PaymentBss([page])
+    service = BillingService(client)
+    with pytest.raises(McpToolError):
+        if action == "pay":
+            await service.pay_order(**ARGS, confirm=True)
+        else:
+            await service.cancel_order(order_id=ORDER, confirm=True)
+    assert not client.attempted and not client.cancelled
+
+
 @pytest.mark.parametrize(
     "changes",
     [

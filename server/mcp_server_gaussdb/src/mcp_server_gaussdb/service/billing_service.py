@@ -3,7 +3,7 @@
 import asyncio
 import re
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, TypeGuard
 
 from huaweicloud_mcp_core import McpToolError, clamp_limit, page_result, single_result
 from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
@@ -111,10 +111,15 @@ def _items(response: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def _is_integer(value: Any) -> TypeGuard[int]:
+    """Accept JSON integers while excluding booleans from status and count fields."""
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _summary(info: dict[str, Any]) -> dict[str, Any]:
     result = {key: info[key] for key in _ORDER_FIELDS if key in info}
     status = info.get("status")
-    result["status_name"] = _STATUSES.get(status, "unknown") if type(status) is int else "unknown"
+    result["status_name"] = _STATUSES.get(status, "unknown") if _is_integer(status) else "unknown"
     result["sub_order_infos"] = [
         {key: child[key] for key in _ORDER_FIELDS if key in child}
         for child in info.get("sub_order_infos") or []
@@ -123,7 +128,7 @@ def _summary(info: dict[str, Any]) -> dict[str, Any]:
 
 
 def _require_unpaid(info: dict[str, Any], action: str = "cancelled") -> None:
-    if type(info.get("status")) is not int or info["status"] != 6 or info.get("payment_time"):
+    if not _is_integer(info.get("status")) or info["status"] != 6 or info.get("payment_time"):
         raise McpToolError(
             "MCP_INVALID_ARGS",
             f"Only an unpaid pending-payment GaussDB order can be {action}.",
@@ -237,7 +242,7 @@ class BillingService:
         items = _items(response)
         _check_protection(info, items, "pay_order")
         total = response.get("total_count")
-        if type(total) is not int or not 1 <= total <= 1000 or not items or len(items) > total:
+        if not _is_integer(total) or not 1 <= total <= 1000 or not items or len(items) > total:
             raise _invalid("Cannot verify all order lines within the 1000-line payment limit.")
         offset = len(items)
         while offset < total:
@@ -362,7 +367,7 @@ class BillingService:
             )
         # Read every line so mixed-product orders cannot hide beyond the first page.
         total = response.get("total_count")
-        if type(total) is not int or not 1 <= total <= 1000 or not items or len(items) > total:
+        if not _is_integer(total) or not 1 <= total <= 1000 or not items or len(items) > total:
             raise _invalid("Cannot verify all order lines within the 1000-line cancellation limit.")
         offset = len(items)
         while offset < total:

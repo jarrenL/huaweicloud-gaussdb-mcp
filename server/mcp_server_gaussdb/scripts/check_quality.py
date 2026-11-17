@@ -7,12 +7,13 @@ its issue count, but do not replace the repository's existing Ruff style checks.
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 from collections.abc import Iterator
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from pylint.lint import Run
+from pylint.reporters.json_reporter import JSONReporter
 from radon.complexity import cc_visit
 
 MAX_COMPLEXITY = 19
@@ -23,6 +24,7 @@ PYLINT_GATED_SYMBOLS = {
     "too-many-locals",
     "unused-import",
     "cyclic-import",
+    "unidiomatic-typecheck",
 }
 
 
@@ -43,15 +45,15 @@ def complexity_results(root: Path) -> list[tuple[int, str, int, str]]:
 
 
 def pylint_results(root: Path) -> tuple[list[dict[str, Any]], int]:
-    scan = subprocess.run(
-        [sys.executable, "-m", "pylint", str(root), "--output-format=json"],
-        check=False,
-        capture_output=True,
-        text=True,
+    output = StringIO()
+    scan = Run(
+        [str(root), "--reports=n", "--score=n"],
+        reporter=JSONReporter(output),
+        exit=False,
     )
-    if scan.returncode & 32:
-        raise RuntimeError(f"Pylint could not run: {scan.stderr.strip()}")
-    messages = json.loads(scan.stdout)
+    if scan.linter.msg_status & 32:
+        raise RuntimeError("Pylint could not run.")
+    messages = json.loads(output.getvalue())
     if not isinstance(messages, list):
         raise RuntimeError("Pylint did not return a diagnostic list.")
     blocked = [
@@ -63,10 +65,17 @@ def pylint_results(root: Path) -> tuple[list[dict[str, Any]], int]:
 
 
 def main() -> int:
-    root = Path(__file__).resolve().parents[1] / "src"
-    scores = complexity_results(root)
+    package = Path(__file__).resolve().parents[1]
+    scores = sorted(
+        (
+            item
+            for name in ("src", "tests", "scripts")
+            for item in complexity_results(package / name)
+        ),
+        reverse=True,
+    )
     violations = [item for item in scores if item[0] > MAX_COMPLEXITY]
-    issues, total = pylint_results(root)
+    issues, total = pylint_results(package / "src")
     print(f"Complexity: max={scores[0][0] if scores else 0}; required <20")
     for score, path, line, name in violations:
         print(f"FAIL: {path}:{line} {name} complexity={score}")

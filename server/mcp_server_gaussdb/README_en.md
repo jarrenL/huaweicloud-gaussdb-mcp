@@ -322,7 +322,7 @@ uv build --directory server/mcp_server_gaussdb
 
 Default tests do not access cloud resources. Live validation must be explicitly enabled in a dedicated test account. Any billable resource must be cleaned up on failure as well as success, and its deletion job must reach a terminal state. Before release, also verify wheel metadata, installation in a clean Python 3.10 environment, the MCP tool list, and the absence of credentials or resource identifiers in deliverables.
 
-The quality gate requires every GaussDB source function to have cyclomatic complexity below 20. It also blocks Pylint errors and structural findings such as excessive boolean expressions or branches. Ruff remains the style checker.
+The quality gate requires every GaussDB source, test and script function to have cyclomatic complexity below 20. It also blocks source Pylint errors, unidiomatic type checks and structural findings such as excessive boolean expressions or branches. Ruff remains the style checker.
 
 ## Contributing and support
 
