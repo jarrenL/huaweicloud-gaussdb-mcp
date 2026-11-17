@@ -4,7 +4,7 @@ from typing import Any
 
 from huaweicloud_mcp_core import ToolRisk, guard
 
-from ..server import mcp
+from ..application import mcp
 from ..service.billing_service import BillingService
 
 

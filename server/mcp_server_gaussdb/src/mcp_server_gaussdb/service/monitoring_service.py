@@ -84,6 +84,128 @@ def _key(item: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _validate_query_metrics(
+    instance_id: str, metrics: list[dict[str, Any]], period: int, aggregation: str, max_points: int
+) -> list[dict[str, Any]]:
+    _resource_id(instance_id, "instance_id")
+    if not isinstance(metrics, list) or not 1 <= len(metrics) <= 20:
+        raise _invalid("metrics must contain 1-20 discovered series per tool call.")
+    selected = [_descriptor(metric, instance_id) for metric in metrics]
+    if len({_key(metric) for metric in selected}) != len(selected):
+        raise _invalid("Duplicate metric/dimension combinations must be removed.")
+    if isinstance(period, bool) or not isinstance(period, int) or period not in _PERIODS:
+        raise _invalid("period must be 1, 60, 300, 1200, 3600, 14400 or 86400 seconds.")
+    if not isinstance(aggregation, str) or aggregation not in _AGGREGATIONS:
+        raise _invalid("aggregation must be average, variance, min, max or sum.")
+    if (
+        isinstance(max_points, bool)
+        or not isinstance(max_points, int)
+        or not 1 <= max_points <= 100
+    ):
+        raise _invalid("max_points must be between 1 and 100 per series.")
+    return selected
+
+
+def _query_window(
+    selected: list[dict[str, Any]], start_time: int | str, end_time: int | str, period: int
+) -> tuple[int, int]:
+    start_ms = normalize_time_ms(start_time, "start_time")
+    end_ms = normalize_time_ms(end_time, "end_time")
+    if not 1111111111111 <= start_ms < end_ms <= 9999999999999:
+        raise _invalid(
+            "Use an increasing time range within CES's supported millisecond timestamps."
+        )
+    # CES interprets period=1 as raw points collected every 60 seconds for GaussDB.
+    effective_period = 60 if period == 1 else period
+    upper_bound = len(selected) * (math.ceil((end_ms - start_ms) / (effective_period * 1000)) + 1)
+    if upper_bound > 3000:
+        raise McpToolError(
+            "MCP_INVALID_ARGS",
+            "The query could exceed CES's 3000-point batch limit.",
+            hint="Shorten the time range, increase period, or split the metric list. "
+            "The tool does not silently allow CES to shorten the requested time window.",
+        )
+    return start_ms, end_ms
+
+
+def _valid_point(timestamp: Any, value: Any, start_ms: int, end_ms: int) -> bool:
+    if not isinstance(timestamp, int) or isinstance(timestamp, bool):
+        return False
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    return start_ms <= timestamp <= end_ms and math.isfinite(value)
+
+
+def _series_item(
+    metric: dict[str, Any],
+    cloud: dict[str, Any],
+    start_ms: int,
+    end_ms: int,
+    effective_aggregation: str,
+    max_points: int,
+) -> dict[str, Any]:
+    points = []
+    for point in cloud.get("datapoints") or []:
+        timestamp, value = point.get("timestamp"), point.get(effective_aggregation)
+        if _valid_point(timestamp, value, start_ms, end_ms):
+            points.append({"timestamp": timestamp, "value": value})
+    points.sort(key=lambda point: point["timestamp"])
+    values = [point["value"] for point in points]
+    return {
+        **metric,
+        "unit": cloud.get("unit"),
+        "status": "ok" if points else "no_data",
+        "datapoint_count": len(points),
+        "datapoints": points[-max_points:],
+        "datapoints_truncated": len(points) > max_points,
+        "summary": {
+            "minimum": min(values) if values else None,
+            "maximum": max(values) if values else None,
+            "aggregation_values_mean": math.fsum(values) / len(values) if values else None,
+            "latest_value": points[-1]["value"] if points else None,
+            "latest_timestamp": points[-1]["timestamp"] if points else None,
+        },
+        "observed_window": {
+            "first_timestamp": points[0]["timestamp"] if points else None,
+            "last_timestamp": points[-1]["timestamp"] if points else None,
+        },
+    }
+
+
+def _response_items(
+    selected: list[dict[str, Any]],
+    response: dict[str, Any],
+    start_ms: int,
+    end_ms: int,
+    aggregation: str,
+    max_points: int,
+) -> list[dict[str, Any]]:
+    returned = {_key(item): item for item in response.get("metrics") or []}
+    return [
+        _series_item(
+            metric, returned.get(_key(metric), {}), start_ms, end_ms, aggregation, max_points
+        )
+        for metric in selected
+    ]
+
+
+def _query_hints(items: list[dict[str, Any]], period: int) -> list[str]:
+    hints = [
+        "Summaries use all received aggregation values within the requested time window, "
+        "not only the displayed points. aggregation_values_mean is not a raw-sample mean.",
+        "Retention, collection periods and delay can leave gaps. observed_window reports "
+        "actual received coverage, not guaranteed full coverage.",
+    ]
+    if any(item["status"] == "no_data" for item in items):
+        hints.append(
+            "No data is not zero or proof of health. Check the discovered dimensions, "
+            "time range/retention, instance version, standby role, and collection delay."
+        )
+    if period == 1:
+        hints.append("CES period=1 uses raw values; aggregation is forced to average.")
+    return hints
+
+
 class MonitoringService:
     def __init__(self, client: CesMonitoringClient | None = None) -> None:
         # Delay client construction until after argument validation.
@@ -164,40 +286,8 @@ class MonitoringService:
         aggregation: str = "average",
         max_points: int = 20,
     ) -> dict[str, Any]:
-        _resource_id(instance_id, "instance_id")
-        if not isinstance(metrics, list) or not 1 <= len(metrics) <= 20:
-            raise _invalid("metrics must contain 1-20 discovered series per tool call.")
-        selected = [_descriptor(metric, instance_id) for metric in metrics]
-        if len({_key(metric) for metric in selected}) != len(selected):
-            raise _invalid("Duplicate metric/dimension combinations must be removed.")
-        if isinstance(period, bool) or not isinstance(period, int) or period not in _PERIODS:
-            raise _invalid("period must be 1, 60, 300, 1200, 3600, 14400 or 86400 seconds.")
-        if not isinstance(aggregation, str) or aggregation not in _AGGREGATIONS:
-            raise _invalid("aggregation must be average, variance, min, max or sum.")
-        if (
-            isinstance(max_points, bool)
-            or not isinstance(max_points, int)
-            or not 1 <= max_points <= 100
-        ):
-            raise _invalid("max_points must be between 1 and 100 per series.")
-        start_ms = normalize_time_ms(start_time, "start_time")
-        end_ms = normalize_time_ms(end_time, "end_time")
-        if not 1111111111111 <= start_ms < end_ms <= 9999999999999:
-            raise _invalid(
-                "Use an increasing time range within CES's supported millisecond timestamps."
-            )
-        # CES interprets period=1 as raw points collected every 60 seconds for GaussDB.
-        effective_period = 60 if period == 1 else period
-        upper_bound = len(selected) * (
-            math.ceil((end_ms - start_ms) / (effective_period * 1000)) + 1
-        )
-        if upper_bound > 3000:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                "The query could exceed CES's 3000-point batch limit.",
-                hint="Shorten the time range, increase period, or split the metric list. "
-                "The tool does not silently allow CES to shorten the requested time window.",
-            )
+        selected = _validate_query_metrics(instance_id, metrics, period, aggregation, max_points)
+        start_ms, end_ms = _query_window(selected, start_time, end_time, period)
         effective_aggregation = "average" if period == 1 else aggregation
         response = await self._ces().batch_list_metric_data(
             metrics=selected,
@@ -206,60 +296,9 @@ class MonitoringService:
             period=period,
             aggregation=effective_aggregation,
         )
-        returned = {_key(item): item for item in response.get("metrics") or []}
-        items = []
-        for metric in selected:
-            cloud = returned.get(_key(metric), {})
-            points = []
-            for point in cloud.get("datapoints") or []:
-                timestamp, value = point.get("timestamp"), point.get(effective_aggregation)
-                if (
-                    isinstance(timestamp, int)
-                    and not isinstance(timestamp, bool)
-                    and start_ms <= timestamp <= end_ms
-                    and isinstance(value, (int, float))
-                    and not isinstance(value, bool)
-                    and math.isfinite(value)
-                ):
-                    points.append({"timestamp": timestamp, "value": value})
-            points.sort(key=lambda point: point["timestamp"])
-            values = [point["value"] for point in points]
-            items.append(
-                {
-                    **metric,
-                    "unit": cloud.get("unit"),
-                    "status": "ok" if points else "no_data",
-                    "datapoint_count": len(points),
-                    "datapoints": points[-max_points:],
-                    "datapoints_truncated": len(points) > max_points,
-                    "summary": {
-                        "minimum": min(values) if values else None,
-                        "maximum": max(values) if values else None,
-                        "aggregation_values_mean": math.fsum(values) / len(values)
-                        if values
-                        else None,
-                        "latest_value": points[-1]["value"] if points else None,
-                        "latest_timestamp": points[-1]["timestamp"] if points else None,
-                    },
-                    "observed_window": {
-                        "first_timestamp": points[0]["timestamp"] if points else None,
-                        "last_timestamp": points[-1]["timestamp"] if points else None,
-                    },
-                }
-            )
-        hints = [
-            "Summaries use all received aggregation values within the requested time window, "
-            "not only the displayed points. aggregation_values_mean is not a raw-sample mean.",
-            "Retention, collection periods and delay can leave gaps. observed_window reports "
-            "actual received coverage, not guaranteed full coverage.",
-        ]
-        if any(item["status"] == "no_data" for item in items):
-            hints.append(
-                "No data is not zero or proof of health. Check the discovered dimensions, "
-                "time range/retention, instance version, standby role, and collection delay."
-            )
-        if period == 1:
-            hints.append("CES period=1 uses raw values; aggregation is forced to average.")
+        items = _response_items(
+            selected, response, start_ms, end_ms, effective_aggregation, max_points
+        )
         return {
             **page_result(items, total=len(items)),
             "instance_id": instance_id,
@@ -268,5 +307,5 @@ class MonitoringService:
             "period": period,
             "aggregation": effective_aggregation,
             "max_points": max_points,
-            "hints": hints,
+            "hints": _query_hints(items, period),
         }

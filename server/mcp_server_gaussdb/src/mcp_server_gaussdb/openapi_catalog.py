@@ -127,6 +127,33 @@ def get_operation(name: str) -> OpenApiOperation | None:
     return operations().get(name)
 
 
+def _assigned_parameter(statement: ast.stmt, fields: dict[str, str]) -> str | None:
+    if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
+        return None
+    target, value = statement.targets[0], statement.value
+    if not isinstance(target, ast.Attribute) or not isinstance(value, ast.Name):
+        return None
+    if not isinstance(target.value, ast.Name):
+        return None
+    if target.value.id == "self" and target.attr in fields and value.id == target.attr:
+        return target.attr
+    return None
+
+
+def _constructor_required_fields(model: Any) -> list[str]:
+    required = []
+    try:
+        function = ast.parse(textwrap.dedent(inspect.getsource(model.__init__))).body[0]
+        if isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for statement in function.body:
+                field = _assigned_parameter(statement, model.openapi_types)
+                if field is not None:
+                    required.append(field)
+    except (OSError, TypeError, SyntaxError):
+        pass
+    return required
+
+
 def _type_schema(type_name: str, seen: set[str], depth: int) -> dict[str, Any]:
     primitive: dict[str, dict[str, Any]] = {
         "str": {"type": "string"},
@@ -175,26 +202,7 @@ def _type_schema(type_name: str, seen: set[str], depth: int) -> dict[str, Any]:
         }
         for attr, field_type in model.openapi_types.items()
     }
-    required: list[str] = []
-    try:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(model.__init__)))
-        function = tree.body[0]
-        if isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            for statement in function.body:
-                if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
-                    continue
-                target, value = statement.targets[0], statement.value
-                if (
-                    isinstance(target, ast.Attribute)
-                    and isinstance(target.value, ast.Name)
-                    and target.value.id == "self"
-                    and target.attr in model.openapi_types
-                    and isinstance(value, ast.Name)
-                    and value.id == target.attr
-                ):
-                    required.append(target.attr)
-    except (OSError, TypeError, SyntaxError):
-        pass
+    required = _constructor_required_fields(model)
     schema: dict[str, Any] = {
         "type": "object",
         "properties": properties,

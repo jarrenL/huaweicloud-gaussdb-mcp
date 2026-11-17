@@ -4,7 +4,7 @@
 
 ## 版本
 
-当前版本：`0.8.0`；Python `3.10+`；MCP Python SDK `2.x`。
+当前版本：`0.8.1`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -175,7 +175,7 @@ BSS 付款接口不接收该字段，因此它不构成原子扣款上限。
 
 ### 全量 OpenAPI 访问
 
-服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.8.0` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
+服务启动时会从已安装的华为云 GaussDB SDK 自动发现公开请求接口。`0.8.1` 基于 SDK `3.1.218` 可发现 265 个请求型操作，包括版本化和历史兼容接口。为避免把数百个工具结构同时放入模型上下文，调用流程为：
 
 1. 使用 `list_openapi_operations` 按名称、能力分类或风险分页检索。
 2. 使用 `describe_openapi_operation` 获取字段名、嵌套对象、数组及 SDK 模型信息。
@@ -417,11 +417,14 @@ mcp-server-huaweicloud-gaussdb -t streamable-http
 ```bash
 # From the repository root:
 bash scripts/test.sh gaussdb
+uv run --directory server/mcp_server_gaussdb python scripts/check_quality.py
 uv build --directory libs/huaweicloud_mcp_core
 uv build --directory server/mcp_server_gaussdb
 ```
 
 默认测试不访问云上资源。Live 验证只能在专用测试账号中显式启用；创建计费资源时必须在失败路径也执行清理，并确认删除任务到达终态。发布前还应检查 wheel 元数据、全新 Python 3.10 环境安装、MCP 工具列表，以及交付包中是否存在凭证和资源标识。
+
+质量检查要求 GaussDB 源码函数的圈复杂度严格小于 20，并阻断 pylint 错误及布尔表达式过多、分支过多等结构性问题；代码风格继续由 Ruff 检查。
 
 ## 贡献和支持
 
@@ -429,8 +432,8 @@ uv build --directory server/mcp_server_gaussdb
 
 ## 许可证
 
-Apache License 2.0。
+MIT License。
 
 ### 安全与可靠性
 
-版本 0.8.0 的凭证成套选择、接口审核、变更保护、异常脱敏、审计容量及 HTTP 接入要求见 [安全与可靠性说明](SECURITY.md)。
+版本 0.8.1 的凭证成套选择、接口审核、变更保护、异常脱敏、审计容量及 HTTP 接入要求见 [安全与可靠性说明](SECURITY.md)。

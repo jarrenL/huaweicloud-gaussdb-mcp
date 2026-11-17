@@ -49,4 +49,4 @@ uv run mcp_server_rfs
 
 ## License
 
-MIT。迁入的 GaussDB 子包保留 [Apache-2.0 许可证](server/mcp_server_gaussdb/LICENSE)。
+MIT，详见 [LICENSE](LICENSE)。

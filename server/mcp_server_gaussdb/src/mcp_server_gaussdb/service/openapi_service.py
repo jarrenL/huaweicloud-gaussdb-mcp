@@ -4,6 +4,7 @@ from typing import Any
 
 from huaweicloud_mcp_core import McpToolError, ToolRisk, clamp_limit, page_result, single_result
 from huaweicloud_mcp_core.guardrails.protect import extract_tag_set, match_resource
+from huaweicloud_mcp_core.guardrails.rules import Rule, load_rules
 
 from ..client.gaussdb_client import GaussDBClient
 from ..openapi_catalog import get_operation, operation_schema, operations
@@ -66,6 +67,57 @@ def _with_invocation_guidance(summary: dict[str, Any]) -> dict[str, Any]:
         **({"dedicated_tool": dedicated_tool} if dedicated_tool else {}),
         **_REQUEST_SHAPE_GUIDANCE.get(operation, {}),
     }
+
+
+def _target_instances(request: dict[str, Any]) -> set[str]:
+    targets: set[str] = set()
+
+    def visit(value: Any, parent: str = "") -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                normalized = str(key).replace("-", "_").lower()
+                if normalized in {
+                    "instance_id",
+                    "instanceid",
+                    "instance_ids",
+                    "instanceids",
+                    "source_instance_id",
+                    "target_instance_id",
+                }:
+                    if isinstance(item, str):
+                        targets.add(item)
+                    elif isinstance(item, list) and all(isinstance(i, str) for i in item):
+                        targets.update(item)
+                    else:
+                        raise McpToolError("MCP_INVALID_ARGS", "Instance IDs must be strings.")
+                elif (
+                    normalized == "id"
+                    and parent in {"instances", "instance"}
+                    and isinstance(item, str)
+                ):
+                    targets.add(item)
+                visit(item, normalized)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item, parent)
+
+    visit(request)
+    return targets
+
+
+def _apply_resource_rule(rule: Rule, confirm: bool, warnings: list[dict[str, str]]) -> None:
+    if rule.action == "warn":
+        warnings.append({"rule_id": rule.id, "message": rule.message or rule.id})
+    elif rule.action == "confirm" and confirm:
+        return
+    else:
+        raise McpToolError(
+            "MCP_CONFIRMATION_REQUIRED" if rule.action == "confirm" else "MCP_GUARDRAIL_BLOCKED",
+            rule.message or f"Target matches resource rule '{rule.id}'.",
+            hint="Review the actual resource and call with confirm=true."
+            if rule.action == "confirm"
+            else "Request a protection-rule exemption.",
+        )
 
 
 class OpenApiService:
@@ -216,40 +268,7 @@ class OpenApiService:
     async def _protect_targets(
         self, request: dict[str, Any], risk: ToolRisk, confirm: bool = False, operation: str = ""
     ) -> list[dict[str, str]]:
-        from huaweicloud_mcp_core.guardrails.rules import Rule, load_rules
-
-        targets: set[str] = set()
-
-        def visit(value: Any, parent: str = "") -> None:
-            if isinstance(value, dict):
-                for key, item in value.items():
-                    normalized = str(key).replace("-", "_").lower()
-                    if normalized in {
-                        "instance_id",
-                        "instanceid",
-                        "instance_ids",
-                        "instanceids",
-                        "source_instance_id",
-                        "target_instance_id",
-                    }:
-                        if isinstance(item, str):
-                            targets.add(item)
-                        elif isinstance(item, list) and all(isinstance(i, str) for i in item):
-                            targets.update(item)
-                        else:
-                            raise McpToolError("MCP_INVALID_ARGS", "Instance IDs must be strings.")
-                    elif (
-                        normalized == "id"
-                        and parent in {"instances", "instance"}
-                        and isinstance(item, str)
-                    ):
-                        targets.add(item)
-                    visit(item, normalized)
-            elif isinstance(value, list):
-                for item in value:
-                    visit(item, parent)
-
-        visit(request)
+        targets = _target_instances(request)
         if len(targets) > 100:
             raise McpToolError("MCP_INVALID_ARGS", "At most 100 target instances are allowed.")
         tool_name = f"invoke_{risk.value.lower()}_openapi"
@@ -261,25 +280,9 @@ class OpenApiService:
         ]
         warnings: list[dict[str, str]] = []
 
-        def apply_rule(rule: Rule) -> None:
-            if rule.action == "warn":
-                warnings.append({"rule_id": rule.id, "message": rule.message or rule.id})
-            elif rule.action == "confirm" and confirm:
-                return
-            else:
-                raise McpToolError(
-                    "MCP_CONFIRMATION_REQUIRED"
-                    if rule.action == "confirm"
-                    else "MCP_GUARDRAIL_BLOCKED",
-                    rule.message or f"Target matches resource rule '{rule.id}'.",
-                    hint="Review the actual resource and call with confirm=true."
-                    if rule.action == "confirm"
-                    else "Request a protection-rule exemption.",
-                )
-
         for rule in rules:
             if rule.resources.is_empty():
-                apply_rule(rule)
+                _apply_resource_rule(rule, confirm, warnings)
         if not targets and any(
             not rule.resources.is_empty() and rule.action != "warn" for rule in rules
         ):
@@ -306,5 +309,5 @@ class OpenApiService:
                     tags=extract_tag_set(resource.get("tags") or {}),
                 ):
                     continue
-                apply_rule(rule)
+                _apply_resource_rule(rule, confirm, warnings)
         return warnings

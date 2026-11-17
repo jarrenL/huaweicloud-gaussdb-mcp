@@ -208,22 +208,7 @@ class BillingService:
                         "use get_order and get_instance to verify provisioning."
                     ],
                 )
-            _check_payment_amount(info, amount, currency)
-            items = _items(response)
-            _check_protection(info, items, "pay_order")
-            total = response.get("total_count")
-            if type(total) is not int or not 1 <= total <= 1000 or not items or len(items) > total:
-                raise _invalid("Cannot verify all order lines within the 1000-line payment limit.")
-            offset = len(items)
-            while offset < total:
-                page = await self._bss().get_order(order_id=order_id, limit=100, offset=offset)
-                current = _order_info(page, order_id)
-                _check_payment_amount(current, amount, currency)
-                chunk = _items(page)
-                _check_protection(current, chunk, "pay_order")
-                if page.get("total_count") != total or not chunk or offset + len(chunk) > total:
-                    raise _invalid("Order changed or pagination was incomplete; payment stopped.")
-                offset += len(chunk)
+            total = await self._verify_payment_lines(order_id, response, amount, currency)
             if confirm is not True:
                 return single_result(
                     {
@@ -242,50 +227,77 @@ class BillingService:
             _check_protection(current, _items(latest), "pay_order")
             if latest.get("total_count") != total:
                 raise _invalid("Order lines changed before payment; obtain approval again.")
-            submission_error: dict[str, Any] | None = None
-            try:
-                await self._bss().pay_order(order_id=order_id)
-            except McpToolError as exc:
-                # A timeout/failed response may follow an accepted payment. Never retry here.
-                submission_error = exc.to_dict()["error"]
-            result: dict[str, Any] = {
-                "order_id": order_id,
-                "expected_amount": expected_amount,
-                "currency": currency,
-                "payment_submitted": True if submission_error is None else None,
-                "payment_verified": False,
-            }
-            if submission_error is not None:
-                result["submission_error"] = submission_error
-            try:
-                checked = _order_info(
-                    await self._bss().get_order(order_id=order_id, limit=1, offset=0), order_id
-                )
-                result["order"] = _summary(checked)
-                result["payment_verified"] = checked.get("status") in {3, 5} and bool(
-                    checked.get("payment_time")
-                )
-                result["order_amount_matches_approval"] = (
-                    checked.get("currency") == currency
-                    and _money(checked.get("amount_after_discount")) == amount
-                    and _money(checked.get("official_amount")) == amount
-                )
-                if not result["order_amount_matches_approval"]:
-                    result["warnings"] = [
-                        "BSS order amounts differ from the approved values. Inspect billing "
-                        "details; this tool does not automatically refund or pay again."
-                    ]
-            except McpToolError as exc:
-                result["verification_error"] = exc.to_dict()["error"]
-            return single_result(
-                result,
-                [
-                    "Payment submission is not instance readiness. Track get_order and verify "
-                    "get_instance after provisioning. If the submission result is unknown or "
-                    "payment_verified is false, inspect the order before "
-                    "any further payment attempt.",
-                ],
+            return await self._submit_payment(order_id, expected_amount, currency, amount)
+
+    async def _verify_payment_lines(
+        self, order_id: str, response: dict[str, Any], amount: Decimal, currency: str
+    ) -> int:
+        info = _order_info(response, order_id)
+        _check_payment_amount(info, amount, currency)
+        items = _items(response)
+        _check_protection(info, items, "pay_order")
+        total = response.get("total_count")
+        if type(total) is not int or not 1 <= total <= 1000 or not items or len(items) > total:
+            raise _invalid("Cannot verify all order lines within the 1000-line payment limit.")
+        offset = len(items)
+        while offset < total:
+            page = await self._bss().get_order(order_id=order_id, limit=100, offset=offset)
+            current = _order_info(page, order_id)
+            _check_payment_amount(current, amount, currency)
+            chunk = _items(page)
+            _check_protection(current, chunk, "pay_order")
+            if page.get("total_count") != total or not chunk or offset + len(chunk) > total:
+                raise _invalid("Order changed or pagination was incomplete; payment stopped.")
+            offset += len(chunk)
+        return total
+
+    async def _submit_payment(
+        self, order_id: str, expected_amount: str, currency: str, amount: Decimal
+    ) -> dict[str, Any]:
+        submission_error: dict[str, Any] | None = None
+        try:
+            await self._bss().pay_order(order_id=order_id)
+        except McpToolError as exc:
+            # A timeout/failed response may follow an accepted payment. Never retry here.
+            submission_error = exc.to_dict()["error"]
+        result: dict[str, Any] = {
+            "order_id": order_id,
+            "expected_amount": expected_amount,
+            "currency": currency,
+            "payment_submitted": True if submission_error is None else None,
+            "payment_verified": False,
+        }
+        if submission_error is not None:
+            result["submission_error"] = submission_error
+        try:
+            checked = _order_info(
+                await self._bss().get_order(order_id=order_id, limit=1, offset=0), order_id
             )
+            result["order"] = _summary(checked)
+            result["payment_verified"] = checked.get("status") in {3, 5} and bool(
+                checked.get("payment_time")
+            )
+            result["order_amount_matches_approval"] = (
+                checked.get("currency") == currency
+                and _money(checked.get("amount_after_discount")) == amount
+                and _money(checked.get("official_amount")) == amount
+            )
+            if not result["order_amount_matches_approval"]:
+                result["warnings"] = [
+                    "BSS order amounts differ from the approved values. Inspect billing "
+                    "details; this tool does not automatically refund or pay again."
+                ]
+        except McpToolError as exc:
+            result["verification_error"] = exc.to_dict()["error"]
+        return single_result(
+            result,
+            [
+                "Payment submission is not instance readiness. Track get_order and verify "
+                "get_instance after provisioning. If the submission result is unknown or "
+                "payment_verified is false, inspect the order before "
+                "any further payment attempt.",
+            ],
+        )
 
     async def get_order(
         self, *, order_id: str, limit: int = 20, marker: str | None = None

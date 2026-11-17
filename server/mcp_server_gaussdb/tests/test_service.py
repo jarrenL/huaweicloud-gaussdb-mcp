@@ -184,7 +184,7 @@ async def test_discover_create_options(
 
     fake_client.show_deployment_form = show_deployment_form
     monkeypatch.setattr(
-        "mcp_server_gaussdb.service.gaussdb_service.resolve_project_context",
+        "mcp_server_gaussdb.service.create_options.resolve_project_context",
         lambda value: ProjectContext("project", "domain"),
     )
     service = GaussDBService(

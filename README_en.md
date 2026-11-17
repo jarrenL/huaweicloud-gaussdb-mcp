@@ -42,4 +42,4 @@ See [docs/08-new-service-walkthrough.md](docs/development/08-new-service-walkthr
 
 ## License
 
-MIT. The imported GaussDB subpackage retains its [Apache-2.0 license](server/mcp_server_gaussdb/LICENSE).
+MIT. See [LICENSE](LICENSE).

@@ -1,7 +1,6 @@
 """Scenario-oriented GaussDB management service."""
 
 import asyncio
-import difflib
 import re
 import time
 from typing import Any
@@ -11,14 +10,30 @@ from huaweicloud_mcp_core import (
     McpToolError,
     clamp_limit,
     page_result,
-    resolve_project_context,
-    run_sdk_call,
     single_result,
 )
 from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
 
 from ..client.gaussdb_client import GaussDBClient
 from ..client.vpc_client import VpcResourceClient
+from .create_common import (
+    _FLAVOR_FIELDS,
+    _pick,
+)
+from .create_options import CreateOptionsService
+from .create_validation import prepare_create_body
+from .parameter_validation import (
+    _parameter_modifiability,
+    _plan_parameter_changes,
+    _validate_parameter_metadata,
+    parameter_detail,
+)
+from .parameter_validation import (
+    _parameter_risk_reasons as _parameter_risk_reasons,
+)
+from .parameter_validation import (
+    _validate_parameter_value as _validate_parameter_value,
+)
 from .time_utils import normalize_time_ms
 from .write_safety import require_manual_payment
 
@@ -49,16 +64,6 @@ _INSTANCE_FIELDS = (
     "time_zone",
     "tags",
     "disk_usage",
-)
-_FLAVOR_FIELDS = (
-    "vcpus",
-    "ram",
-    "spec_code",
-    "az_status",
-    "availability_zone",
-    "version",
-    "name",
-    "group_type",
 )
 _BACKUP_FIELDS = (
     "id",
@@ -95,61 +100,7 @@ _JOB_FAILURE_STATUSES = {"FAILED", "FAIL", "ERROR", "CANCELLED", "CANCELED"}
 _JOB_TERMINAL_STATUSES = _JOB_SUCCESS_STATUSES | _JOB_FAILURE_STATUSES
 _NODE_FIELDS = ("id", "name", "availability_zone_id", "status", "description", "components")
 
-_DEPLOYMENT_FORMS = {
-    "single": {
-        "label": "单副本",
-        "node_layout": "单节点",
-        "intended_use": "development_and_functional_testing",
-        "high_availability": False,
-        "direct_create_supported": True,
-    },
-    "triset": {
-        "label": "1主2备",
-        "node_layout": "1 primary + 2 standby",
-        "intended_use": "production",
-        "high_availability": True,
-        "direct_create_supported": True,
-    },
-    "logger": {
-        "label": "1主1备1日志",
-        "node_layout": "1 primary + 1 standby + 1 logger",
-        "intended_use": "production",
-        # The public v3.2 create model has no solution selector. Returning a triset-shaped
-        # request for logger would silently create the wrong topology.
-        "direct_create_supported": False,
-    },
-}
-_DEPLOYMENT_ALIASES = {"single_replica": "single", "ha": "triset"}
 _DISTRIBUTED_CREATE_BINDING_ERRORS = {"DBS.200054", "DBS.06280045"}
-_RESERVED_PORTS = [
-    2378,
-    2379,
-    2380,
-    4999,
-    5000,
-    5999,
-    6000,
-    6001,
-    8097,
-    8098,
-    12016,
-    12017,
-    20049,
-    20050,
-    21731,
-    21732,
-    32122,
-    32123,
-    32124,
-]
-
-_HIGH_RISK_PARAMETER_RE = re.compile(
-    r"^(?:audit_|ssl(?:_|$)|password_encryption$|fsync$|full_page_writes$|"
-    r"synchronous_commit$|wal_|archive_|max_connections$|shared_buffers$|work_mem$|"
-    r"maintenance_work_mem$|temp_buffers$|enable_thread_pool$|use_workload_manager$|"
-    r"enable_slot_log$|most_available_sync$|replconninfo)",
-    re.IGNORECASE,
-)
 
 
 def _job_hints(job: dict[str, Any]) -> list[str]:
@@ -162,90 +113,12 @@ def _job_hints(job: dict[str, Any]) -> list[str]:
     return []
 
 
-_HIGH_RISK_DESCRIPTION_MARKERS = (
-    "数据丢失",
-    "丢失审计",
-    "谨慎评估",
-    "强制选主",
-    "实例不可用",
-    "业务异常",
-    "data loss",
-    "loss of audit",
-    "service unavailable",
-    "security risk",
-)
 _DIFFERENTIAL_BACKUP_INTERVALS = {15, 30, 60, 180, 360, 720, 1440}
-
-
-def _pick(source: dict[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
-    return {key: source[key] for key in fields if source.get(key) is not None}
 
 
 def _next_marker(offset: int, count: int, total: int | None) -> str | None:
     next_offset = offset + count
     return str(next_offset) if total is not None and next_offset < total else None
-
-
-def _parameter_risk_reasons(parameter: dict[str, Any]) -> list[str]:
-    reasons = []
-    name = str(parameter.get("name") or "").split(":")[-1]
-    description = str(parameter.get("description") or "").lower()
-    if parameter.get("restart_required") is True:
-        reasons.append("restart_required")
-    if _HIGH_RISK_PARAMETER_RE.search(name):
-        reasons.append("sensitive_parameter_family")
-    if any(marker in description for marker in _HIGH_RISK_DESCRIPTION_MARKERS):
-        reasons.append("risk_warning_in_cloud_description")
-    return reasons
-
-
-def _parameter_modifiability(parameter: dict[str, Any]) -> str:
-    if parameter.get("readonly") is False:
-        return "modifiable"
-    if parameter.get("readonly") is True:
-        return "read_only"
-    return "unknown"
-
-
-def _validate_parameter_value(parameter: dict[str, Any], value: str) -> str | None:
-    if value.lower() == "default":
-        return None
-    parameter_type = str(parameter.get("type") or "").lower()
-    value_range = str(parameter.get("value_range") or "").strip()
-    if parameter_type == "boolean" and value.lower() not in {
-        "on",
-        "off",
-        "true",
-        "false",
-        "0",
-        "1",
-    }:
-        return "must be a boolean value (on/off, true/false, or 0/1)"
-
-    numeric_value: float | None = None
-    if parameter_type in {"integer", "float"}:
-        try:
-            numeric_value = int(value) if parameter_type == "integer" else float(value)
-        except ValueError:
-            return f"must be a valid {parameter_type}"
-
-    numeric_range = re.fullmatch(r"(-?\d+(?:\.\d+)?)-(-?\d+(?:\.\d+)?)", value_range)
-    if numeric_value is not None and numeric_range:
-        minimum, maximum = (float(item) for item in numeric_range.groups())
-        if not minimum <= numeric_value <= maximum:
-            return f"must be within {value_range}"
-
-    if "|" in value_range and parameter_type not in {"list", "stringlist"}:
-        allowed = {item.lower() for item in value_range.split("|")}
-        if value.lower() not in allowed:
-            return f"must be one of {value_range}"
-
-    if parameter_type in {"list", "stringlist"} and "," in value_range:
-        allowed = {item.strip().lower() for item in value_range.split(",")}
-        selected = {item.strip().lower() for item in value.split(",")}
-        if not selected <= allowed:
-            return "contains an item outside the cloud-reported value_range"
-    return None
 
 
 class GaussDBService:
@@ -268,502 +141,14 @@ class GaussDBService:
         version: str | None = None,
         limit: int = 20,
     ) -> dict[str, Any]:
-        if ha_mode not in {"enterprise", "centralization_standard"}:
-            raise McpToolError(
-                "MCP_INVALID_ARGS", "ha_mode must be enterprise or centralization_standard."
-            )
-        if product_type not in {"basic", "enterprise", "ecology"}:
-            raise McpToolError(
-                "MCP_INVALID_ARGS", "product_type must be basic, enterprise, or ecology."
-            )
-        if deployment_mode == "ha":
-            deployment_mode = (
-                "triset"
-                if ha_mode == "centralization_standard"
-                else "combined"
-                if product_type == "basic"
-                else "hws"
-            )
-        elif deployment_mode is not None:
-            deployment_mode = _DEPLOYMENT_ALIASES.get(deployment_mode, deployment_mode)
-        if deployment_mode is None:
-            deployment_mode = (
-                "single"
-                if ha_mode == "centralization_standard"
-                else "combined"
-                if product_type == "basic"
-                else "hws"
-            )
-        valid_deployments = set(_DEPLOYMENT_FORMS)
-        if ha_mode == "enterprise":
-            valid_deployments = {"combined"} if product_type == "basic" else {"hws"}
-        if deployment_mode not in valid_deployments:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                "deployment_mode must be single, triset, or logger for centralized instances; "
-                "distributed basic uses combined, and distributed enterprise/ecology uses hws.",
-            )
-        flavor_ha_mode = "combined" if deployment_mode == "combined" else ha_mode
-        storage_ha_mode = "enterprise" if deployment_mode == "combined" else ha_mode
-        page_size = clamp_limit(limit)
-        network = self._network_client or VpcResourceClient(self._settings)
-        context, datastores, flavors, vpcs, subnets, security_groups = await asyncio.gather(
-            run_sdk_call(lambda: resolve_project_context(self._settings), read_only=True),
-            self._client.list_datastores(),
-            self._client.list_flavors_details(
-                # Fetch the full API page for availability decisions. The caller's limit only
-                # controls how many choices are returned, not whether an edition looks sellable.
-                version=version,
-                ha_mode=flavor_ha_mode,
-                limit=100,
-                offset=0,
-            ),
-            network.list_vpcs(limit=100),
-            network.list_subnets(limit=100),
-            network.list_security_groups(limit=100),
-        )
-        engine_versions = datastores.get("versions") or []
-        selected_version = version or (engine_versions[0] if engine_versions else None)
-        all_flavors = list(flavors.get("flavors") or [])
-        flavor_total = int(flavors.get("total") or len(all_flavors))
-        if flavor_total > len(all_flavors):
-            remaining_pages = await asyncio.gather(
-                *(
-                    self._client.list_flavors_details(
-                        version=version,
-                        ha_mode=flavor_ha_mode,
-                        limit=100,
-                        offset=offset,
-                    )
-                    for offset in range(100, flavor_total, 100)
-                )
-            )
-            for page in remaining_pages:
-                all_flavors.extend(page.get("flavors") or [])
-
-        deployment_options: list[dict[str, Any]] = []
-        storage_types: list[dict[str, Any]] = []
-        if selected_version:
-            if ha_mode == "centralization_standard":
-                candidates = list(_DEPLOYMENT_FORMS)
-                queries = [
-                    self._client.show_deployment_form(
-                        solution=solution, engine_version=selected_version
-                    )
-                    for solution in candidates
-                ]
-                responses = await asyncio.gather(*queries, return_exceptions=True)
-                for solution, response in zip(candidates, responses, strict=True):
-                    if isinstance(response, BaseException):
-                        continue
-                    definition = _DEPLOYMENT_FORMS[solution]
-                    deployment_options.append(
-                        {
-                            "value": solution,
-                            **definition,
-                            "initial_node_num": response.get("initial_node_num"),
-                            "replica_num": response.get("replica_num"),
-                            "shard_num": response.get("shard_num"),
-                            "availability_zone_entries": response.get("initial_node_num")
-                            or response.get("replica_num"),
-                            "source": "live_show_deployment_form",
-                        }
-                    )
-            else:
-                if product_type == "basic":
-                    deployment_options = [
-                        {
-                            "value": "combined",
-                            "label": "分布式混合部署",
-                            "node_layout": "distributed combined deployment",
-                            "replica_num": 3,
-                            "availability_zone_entries": 3,
-                            "intended_use": "production",
-                            "high_availability": True,
-                            "direct_create_supported": True,
-                            "flavor_query_ha_mode": "combined",
-                            "source": "live_combined_flavors_and_public_create_api",
-                        }
-                    ]
-                else:
-                    deployment_options = [
-                        {
-                            "value": "hws",
-                            "label": "分布式独立部署",
-                            "node_layout": "distributed independent deployment",
-                            "replica_num": 3,
-                            "availability_zone_entries": 3,
-                            "intended_use": "production",
-                            "high_availability": True,
-                            "direct_create_supported": True,
-                            "flavor_query_ha_mode": "enterprise",
-                            "source": "live_enterprise_flavors_and_public_create_api",
-                        }
-                    ]
-
-            storage_result = await asyncio.gather(
-                self._client.list_storage_types(
-                    version=selected_version,
-                    # The storage API rejects "combined" even though the flavor API returns
-                    # combined specs. The create request still uses mode=enterprise.
-                    ha_mode=storage_ha_mode,
-                ),
-                return_exceptions=True,
-            )
-            if not isinstance(storage_result[0], BaseException):
-                storage_types = [
-                    _pick(item, ("name", "az_status", "support_compute_group_type"))
-                    for item in storage_result[0].get("storage_type") or []
-                ]
-
-        flavor_items = []
-        for item in all_flavors:
-            spec_code = str(item.get("spec_code") or "")
-            group_type = str(item.get("group_type") or "")
-            is_basic = spec_code.startswith("gaussdb.bs.") or group_type in {
-                "exclusive",
-                "armExclusive",
-            }
-            is_ecology = any(
-                marker in spec_code
-                for marker in (".ecology.", "gaussdb.ec.", "gaussdb.opengauss.xe.")
-            )
-            matches_product = {
-                "basic": is_basic,
-                "ecology": is_ecology,
-                "enterprise": not is_basic and not is_ecology,
-            }[product_type]
-            if not matches_product:
-                continue
-            available_zones = [
-                zone for zone, status in (item.get("az_status") or {}).items() if status == "normal"
-            ]
-            if available_zones:
-                flavor_items.append(
-                    {**_pick(item, _FLAVOR_FIELDS), "available_zones": available_zones}
-                )
-
-        def number(value: Any) -> float:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return float("inf")
-
-        flavor_items.sort(key=lambda item: (number(item.get("vcpus")), number(item.get("ram"))))
-        for option in deployment_options:
-            catalog_available = bool(flavor_items and storage_types)
-            option["available"] = catalog_available
-            option["available_flavor_count"] = len(flavor_items)
-            option["availability_source"] = (
-                "live_flavors_and_storage_types"
-                if ha_mode == "enterprise"
-                else "live_deployment_form_flavors_and_storage_types"
-            )
-            option["availability_semantics"] = (
-                "catalog_candidate" if ha_mode == "enterprise" else "deployment_form_validated"
-            )
-            option["create_compatibility"] = (
-                "cloud_final_validation_required"
-                if ha_mode == "enterprise" and catalog_available
-                else "not_applicable"
-                if ha_mode == "enterprise"
-                else "deployment_form_and_catalog_validated"
-            )
-        vpc_items = [
-            _pick(item, ("id", "name", "cidr", "status"))
-            for item in vpcs.get("vpcs") or []
-            if item.get("status") in {None, "OK"}
-        ]
-        subnet_items = [
-            _pick(
-                item,
-                (
-                    "id",
-                    "name",
-                    "vpc_id",
-                    "neutron_network_id",
-                    "cidr",
-                    "gateway_ip",
-                    "availability_zone",
-                    "status",
-                ),
-            )
-            for item in subnets.get("subnets") or []
-            if item.get("status") in {None, "ACTIVE"}
-        ]
-        group_items = [
-            _pick(item, ("id", "name", "description"))
-            for item in security_groups.get("security_groups") or []
-        ]
-        recommended: dict[str, Any] | None = None
-        selected_deployment = next(
-            (item for item in deployment_options if item["value"] == deployment_mode), None
-        )
-        if (
-            flavor_items
-            and vpc_items
-            and subnet_items
-            and group_items
-            and storage_types
-            and selected_deployment
-            and selected_deployment["direct_create_supported"]
-        ):
-            flavor = flavor_items[0]
-            vpc = vpc_items[0]
-            subnet = next(
-                (item for item in subnet_items if item.get("vpc_id") == vpc.get("id")),
-                subnet_items[0],
-            )
-            group = next(
-                (item for item in group_items if item.get("name") == "Sys-default"),
-                group_items[0],
-            )
-            zone = flavor["available_zones"][0]
-            replica_num = int(selected_deployment.get("replica_num") or 3)
-            shard_num = 3 if ha_mode == "enterprise" else 1
-            recommended = {
-                "datastore": {
-                    "type": "GaussDB",
-                    "version": selected_version,
-                },
-                "ha": {
-                    "mode": ha_mode,
-                    "consistency": "strong",
-                    "replication_mode": "sync",
-                    "instance_mode": product_type,
-                },
-                "deployment_solution": deployment_mode,
-                "flavor_ref": flavor.get("spec_code"),
-                "volume": {
-                    "type": storage_types[0].get("name"),
-                    "size": shard_num * 40,
-                },
-                "availability_zone": ",".join([zone] * replica_num),
-                "replica_num": replica_num,
-                "vpc_id": vpc.get("id"),
-                "subnet_id": subnet.get("neutron_network_id") or subnet.get("id"),
-                "security_group_id": group.get("id"),
-                "region": self._settings.region,
-                "port": 8000,
-                "time_zone": "UTC+08:00",
-                "backup_strategy": {"start_time": "02:00-03:00", "keep_days": 7},
-                "charge_info": {"charge_mode": "postPaid"},
-            }
-            if ha_mode == "enterprise":
-                recommended.update({"sharding_num": shard_num, "coordinator_num": 3})
-        return single_result(
-            {
-                "project": {
-                    "project_id": context.project_id,
-                    "domain_id": context.domain_id,
-                    "region": self._settings.region,
-                },
-                "engine_versions": engine_versions,
-                "flavors": flavor_items[:page_size],
-                "available_flavor_count": len(flavor_items),
-                "flavors_truncated": len(flavor_items) > page_size,
-                "storage_types": storage_types,
-                "vpcs": vpc_items,
-                "subnets": subnet_items,
-                "security_groups": group_items,
-                "recommended_configuration": recommended,
-                "recommended_configuration_status": (
-                    "catalog_candidate_cloud_final_validation_required"
-                    if recommended is not None and ha_mode == "enterprise"
-                    else "deployment_form_and_catalog_validated"
-                    if recommended is not None
-                    else "unavailable"
-                ),
-                "deployment_options": deployment_options,
-                "product_type_options": [
-                    {
-                        "value": "basic",
-                        "label": "基础版",
-                        "documented_centralized_compatibility": ["single", "triset", "logger"],
-                        "documented_distributed_compatibility": ["combined"],
-                        "availability_source": "live_flavor_query",
-                    },
-                    {
-                        "value": "enterprise",
-                        "label": "企业版",
-                        "documented_centralized_compatibility": ["single", "triset", "logger"],
-                        "documented_distributed_compatibility": ["hws"],
-                        "availability_source": "live_flavor_query",
-                    },
-                    {
-                        "value": "ecology",
-                        "label": "生态版",
-                        "availability": "requires_matching_live_flavor",
-                        "documented_centralized_compatibility": ["single", "triset", "logger"],
-                        "documented_distributed_compatibility": ["hws"],
-                        "availability_source": "live_flavor_query",
-                    },
-                ],
-                "create_field_options": {
-                    "ha.mode": [
-                        {"value": "centralization_standard", "label": "集中式"},
-                        {"value": "enterprise", "label": "分布式"},
-                    ],
-                    "ha.consistency": [
-                        {"value": "strong", "label": "强一致性"},
-                        {"value": "eventual", "label": "最终一致性"},
-                    ],
-                    "ha.replication_mode": {
-                        "values": ["sync"],
-                        "single_value_reason": (
-                            "The public create API supports synchronous replication only."
-                        ),
-                    },
-                    "volume.type": {
-                        "values": [item.get("name") for item in storage_types if item.get("name")],
-                        "source": "live_list_storage_types",
-                    },
-                    "volume.size_gb": {
-                        "minimum": "sharding_num * 40",
-                        "maximum": "sharding_num * 24000",
-                        "multiple_of": "sharding_num * 4",
-                    },
-                    "charge_info.charge_mode": ["postPaid", "prePaid"],
-                    "charge_info.period_type": ["month", "year"],
-                    "charge_info.period_num": {
-                        "month": {"minimum": 1, "maximum": 9},
-                        "year": {"minimum": 1, "maximum": 3},
-                    },
-                    "availability_zone": {
-                        "values": sorted(
-                            {
-                                zone
-                                for flavor in flavor_items
-                                for zone in flavor.get("available_zones") or []
-                            }
-                        ),
-                        "placement_modes": ["same_az", "multi_az"],
-                        "entry_count": (
-                            selected_deployment.get("availability_zone_entries")
-                            if selected_deployment
-                            else None
-                        ),
-                    },
-                    "port": {
-                        "minimum": 1024,
-                        "maximum": 39998,
-                        "default": 8000,
-                        "reserved": _RESERVED_PORTS,
-                    },
-                    "time_zone": {
-                        "values": [
-                            f"UTC{offset:+03d}:00" if offset else "UTC+00:00"
-                            for offset in range(-12, 13)
-                        ]
-                    },
-                    "backup_strategy.start_time": {
-                        "format": "HH:00-(HH+1):00 UTC",
-                        "default": "02:00-03:00",
-                    },
-                    "backup_strategy.keep_days": {
-                        "minimum": 1,
-                        "maximum": 36500,
-                        "default": 7,
-                    },
-                    "sharding_num": {
-                        "applies_to": "distributed",
-                        "minimum": 1,
-                        "maximum": 256,
-                    },
-                    "coordinator_num": {
-                        "applies_to": "distributed",
-                        "minimum": 1,
-                        "maximum": 256,
-                        "constraint": "coordinator_num <= 2 * sharding_num",
-                    },
-                    "enable_force_switch": [False, True],
-                    "enable_single_float_ip": {
-                        "values": [False, True],
-                        "applies_to": "centralized V2.0-3.207 or later",
-                    },
-                },
-                "create_parameter_groups": {
-                    "common": {
-                        "required": [
-                            "name",
-                            "datastore",
-                            "ha",
-                            "password",
-                            "flavor_ref",
-                            "volume",
-                            "availability_zone",
-                            "vpc_id",
-                            "subnet_id",
-                            "security_group_id",
-                        ],
-                        "optional": [
-                            "configuration_id",
-                            "port",
-                            "backup_strategy",
-                            "enterprise_project_id",
-                            "disk_encryption_id",
-                            "charge_info",
-                            "time_zone",
-                            "enable_force_switch",
-                        ],
-                    },
-                    "centralized_only": {
-                        "deployment_solutions": ["single", "triset", "logger"],
-                        "fields": ["replica_num", "enable_single_float_ip"],
-                        "forbidden": ["sharding_num", "coordinator_num"],
-                        "replica_num_by_solution": {
-                            "single": 1,
-                            "triset": 3,
-                            "logger": 3,
-                        },
-                    },
-                    "distributed_only": {
-                        "deployment_solutions_by_product": {
-                            "basic": ["combined"],
-                            "enterprise": ["hws"],
-                            "ecology": ["hws"],
-                        },
-                        "required": ["sharding_num", "coordinator_num"],
-                        "forbidden": ["enable_single_float_ip"],
-                        "derived_defaults": {"replica_num": 3},
-                        "volume_size_rule": {
-                            "minimum": "sharding_num * 40",
-                            "maximum": "sharding_num * 24000",
-                            "multiple_of": "sharding_num * 4",
-                        },
-                    },
-                },
-                "selection": {
-                    "ha_mode": ha_mode,
-                    "deployment_mode": deployment_mode,
-                    "product_type": product_type,
-                    "flavor_query_ha_mode": flavor_ha_mode,
-                    "storage_query_ha_mode": storage_ha_mode,
-                },
-            },
-            [
-                "Supply a new strong database password and review storage, network, placement, "
-                "backup, and billing settings before creation.",
-                (
-                    "Single-replica instances have no HA or SLA and are intended only for "
-                    "development and functional testing."
-                    if deployment_mode == "single"
-                    else "The public v3.2 create request has no deployment-solution field, so "
-                    "logger is discoverable but is not passed to create_instance as triset."
-                    if deployment_mode == "logger"
-                    else "availability_zone contains one comma-separated entry per replica; "
-                    "entries may repeat for same-AZ placement."
-                ),
-                (
-                    "For distributed creation, live flavor and storage results are catalog "
-                    "candidates, not proof that the current region, tenant, engine version, and "
-                    "product edition are bound for creation. Huawei Cloud performs the final "
-                    "compatibility check when create_instance runs."
-                    if ha_mode == "enterprise"
-                    else "Centralized deployment forms were validated through the live deployment "
-                    "form API."
-                ),
-            ],
+        return await CreateOptionsService(
+            self._client, self._settings, self._network_client
+        ).discover_create_options(
+            ha_mode=ha_mode,
+            deployment_mode=deployment_mode,
+            product_type=product_type,
+            version=version,
+            limit=limit,
         )
 
     async def list_instances(
@@ -830,206 +215,8 @@ class GaussDBService:
         return page_result(items, total=total, marker=_next_marker(offset, len(items), total))
 
     async def create_instance(self, *, configuration: dict[str, Any]) -> dict[str, Any]:
-        require_manual_payment(configuration)
-        required = {
-            "name",
-            "datastore",
-            "ha",
-            "password",
-            "flavor_ref",
-            "volume",
-            "availability_zone",
-            "vpc_id",
-            "subnet_id",
-            "security_group_id",
-        }
-        missing = sorted(required - configuration.keys())
-        if missing:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                f"Missing create configuration fields: {', '.join(missing)}.",
-                hint=(
-                    "Run list_flavors first and supply network, storage, datastore and HA settings."
-                ),
-            )
-        body = {**configuration, "region": configuration.get("region") or self._settings.region}
-        deployment_solution = body.pop("deployment_solution", None)
-        deployment_solution = _DEPLOYMENT_ALIASES.get(deployment_solution, deployment_solution)
-        if deployment_solution == "logger":
-            raise McpToolError(
-                "MCP_UNSUPPORTED_OPERATION",
-                "The public GaussDB v3.2 create API does not expose a deployment-solution "
-                "selector for logger. Refusing to silently create a 1-primary/2-standby instance.",
-                hint=(
-                    "Use discover_create_options to review the live logger template and ask the "
-                    "GaussDB API owner for the supported direct-create mapping, or create a "
-                    "single instance and separately review change_deployment_solution."
-                ),
-            )
+        body = prepare_create_body(configuration, self._settings.region)
         ha = body.get("ha") or {}
-        if ha.get("instance_mode") not in {None, "basic", "enterprise", "ecology"}:
-            raise McpToolError(
-                "MCP_INVALID_ARGS", "ha.instance_mode must be basic, enterprise, or ecology."
-            )
-        if ha.get("consistency") not in {"strong", "eventual"}:
-            raise McpToolError("MCP_INVALID_ARGS", "ha.consistency must be strong or eventual.")
-        if ha.get("replication_mode") != "sync":
-            raise McpToolError("MCP_INVALID_ARGS", "ha.replication_mode must be sync.")
-        if ha.get("mode") == "centralization_standard":
-            if deployment_solution in {"combined", "hws"}:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    f"deployment_solution={deployment_solution} is distributed-only.",
-                )
-            if body.get("sharding_num") is not None or body.get("coordinator_num") is not None:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "sharding_num and coordinator_num are distributed-only fields.",
-                )
-            replica_num = int(body.get("replica_num") or 3)
-            if replica_num not in {1, 3}:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "centralized replica_num must be 1 (single replica) or 3 (HA).",
-                )
-            expected_replica_num = {"single": 1, "triset": 3}.get(deployment_solution)
-            if expected_replica_num is not None and replica_num != expected_replica_num:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    f"deployment_solution={deployment_solution} requires "
-                    f"replica_num={expected_replica_num}.",
-                )
-            zones = [zone.strip() for zone in str(body["availability_zone"]).split(",")]
-            if len(zones) == 1:
-                zones *= replica_num
-            if len(zones) != replica_num:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "availability_zone must contain one AZ or one AZ entry per "
-                    "centralized replica.",
-                )
-            body["availability_zone"] = ",".join(zones)
-            body["replica_num"] = replica_num
-        elif ha.get("mode") == "enterprise":
-            product_type = ha.get("instance_mode") or "enterprise"
-            if deployment_solution is None:
-                deployment_solution = "combined" if product_type == "basic" else "hws"
-            if product_type == "basic" and deployment_solution != "combined":
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "distributed basic instances require deployment_solution=combined.",
-                )
-            if product_type in {"enterprise", "ecology"} and deployment_solution != "hws":
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "distributed enterprise/ecology instances require deployment_solution=hws.",
-                )
-            if body.get("enable_single_float_ip") is not None:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS", "enable_single_float_ip is centralized-only."
-                )
-            sharding_num = int(body.get("sharding_num") or 0)
-            coordinator_num = int(body.get("coordinator_num") or 0)
-            if not 1 <= sharding_num <= 256:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS", "distributed sharding_num must be between 1 and 256."
-                )
-            if not 1 <= coordinator_num <= min(256, sharding_num * 2):
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "distributed coordinator_num must be between 1 and 256 and no more than "
-                    "twice sharding_num.",
-                )
-            replica_num = int(body.get("replica_num") or 3)
-            if replica_num != 3:
-                raise McpToolError("MCP_INVALID_ARGS", "distributed replica_num must be 3.")
-            zones = [zone.strip() for zone in str(body["availability_zone"]).split(",")]
-            if len(zones) == 1:
-                zones *= replica_num
-            if len(zones) != replica_num:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "availability_zone must contain one AZ or three AZ entries for a "
-                    "distributed instance.",
-                )
-            body["availability_zone"] = ",".join(zones)
-            body["replica_num"] = replica_num
-        else:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                "ha.mode must be centralization_standard or enterprise.",
-            )
-
-        volume = body.get("volume") or {}
-        if volume.get("type") not in {"ULTRAHIGH", "ESSD"}:
-            raise McpToolError("MCP_INVALID_ARGS", "volume.type must be ULTRAHIGH or ESSD.")
-        volume_size = int(volume.get("size") or 0)
-        shard_factor = int(body.get("sharding_num") or 1)
-        if not shard_factor * 40 <= volume_size <= shard_factor * 24000:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                "volume.size must be between sharding_num*40 and sharding_num*24000 GiB.",
-            )
-        if volume_size % (shard_factor * 4) != 0:
-            raise McpToolError(
-                "MCP_INVALID_ARGS", "volume.size must be a multiple of sharding_num*4 GiB."
-            )
-
-        port = int(body.get("port") or 8000)
-        if not 1024 <= port <= 39998 or port in _RESERVED_PORTS:
-            raise McpToolError(
-                "MCP_INVALID_ARGS", "port must be 1024-39998 and must not be reserved."
-            )
-        if body.get("time_zone") is not None and not re.fullmatch(
-            r"UTC(?:[+-](?:0\d|1[0-2]):00)", str(body["time_zone"])
-        ):
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                "time_zone must be a full-hour value from UTC-12:00 to UTC+12:00.",
-            )
-
-        backup = body.get("backup_strategy")
-        if backup:
-            keep_days = int(backup.get("keep_days") or 7)
-            if not 1 <= keep_days <= 36500:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS", "backup_strategy.keep_days must be between 1 and 36500."
-                )
-            start_time = backup.get("start_time")
-            if not isinstance(start_time, str) or not re.fullmatch(
-                r"(?:[01]\d|2[0-3]):00-(?:[01]\d|2[0-3]):00", start_time
-            ):
-                raise McpToolError(
-                    "MCP_INVALID_ARGS",
-                    "backup_strategy.start_time must use HH:00-HH:00 UTC format.",
-                )
-            start_hour, end_hour = (int(value[:2]) for value in start_time.split("-"))
-            if end_hour != (start_hour + 1) % 24:
-                raise McpToolError("MCP_INVALID_ARGS", "backup window must span exactly one hour.")
-
-        charge = body.get("charge_info")
-        if charge:
-            charge = dict(charge)
-            body["charge_info"] = charge
-            charge_mode = charge.get("charge_mode")
-            if charge_mode not in {"postPaid", "prePaid"}:
-                raise McpToolError(
-                    "MCP_INVALID_ARGS", "charge_info.charge_mode must be postPaid or prePaid."
-                )
-            if charge_mode == "prePaid":
-                charge.setdefault("is_auto_pay", "false")
-                charge.setdefault("is_auto_renew", "false")
-                period_type = charge.get("period_type")
-                period_num = int(charge.get("period_num") or 0)
-                valid_period = (period_type == "month" and 1 <= period_num <= 9) or (
-                    period_type == "year" and 1 <= period_num <= 3
-                )
-                if not valid_period:
-                    raise McpToolError(
-                        "MCP_INVALID_ARGS",
-                        "prePaid requires period_type month with period_num 1-9, or year with "
-                        "period_num 1-3.",
-                    )
         try:
             response = await self._client.create_database_instance(body=body)
         except McpToolError as exc:
@@ -1220,27 +407,7 @@ class GaussDBService:
                 item for item in parameters if _parameter_modifiability(item) == "modifiable"
             ]
         offset, limit = int(marker or 0), clamp_limit(limit)
-        fields = (
-            "name",
-            "value",
-            "restart_required",
-            "readonly",
-            "value_range",
-            "type",
-            "description",
-        )
-        items = []
-        for item in parameters[offset : offset + limit]:
-            risk_reasons = _parameter_risk_reasons(item)
-            items.append(
-                {
-                    **_pick(item, fields),
-                    "readonly": item.get("readonly"),
-                    "modifiability": _parameter_modifiability(item),
-                    "risk_level": "high" if risk_reasons else "normal",
-                    "risk_reasons": risk_reasons,
-                }
-            )
+        items = [parameter_detail(item) for item in parameters[offset : offset + limit]]
         total = len(parameters)
         result = page_result(items, total=total, marker=_next_marker(offset, len(items), total))
         result["parameter_metadata"] = {
@@ -1262,83 +429,10 @@ class GaussDBService:
         current = await self._client.show_instance_configuration(instance_id=instance_id)
         parameters = current.get("configuration_parameters") or []
         parameter_map = {str(item.get("name") or ""): item for item in parameters}
-        unknown = sorted(set(values) - parameter_map.keys())
-        if unknown:
-            suggestions = {
-                name: difflib.get_close_matches(name, parameter_map.keys(), n=3, cutoff=0.6)
-                for name in unknown
-            }
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                f"Unknown instance parameters: {', '.join(unknown)}.",
-                hint=f"Query get_instance_parameters first. Similar names: {suggestions}",
-            )
-
-        readonly = sorted(name for name in values if parameter_map[name].get("readonly") is True)
-        unknown_modifiability = sorted(
-            name
-            for name in values
-            if parameter_map[name].get("readonly") is not True
-            and parameter_map[name].get("readonly") is not False
+        _validate_parameter_metadata(parameter_map, values, current)
+        effective_values, changes, high_risk_parameters = _plan_parameter_changes(
+            parameter_map, values
         )
-        if readonly:
-            raise McpToolError(
-                "MCP_PARAMETER_READ_ONLY",
-                f"Parameters are explicitly read-only: {', '.join(readonly)}.",
-                hint="Choose parameters returned with modifiability=modifiable.",
-            )
-        if unknown_modifiability:
-            source = current.get("_metadata_api_version", "unknown")
-            raise McpToolError(
-                "MCP_PARAMETER_MODIFIABILITY_UNKNOWN",
-                "Huawei Cloud did not return readonly metadata for: "
-                f"{', '.join(unknown_modifiability)}.",
-                hint=(
-                    f"Metadata source was {source}. Retry get_instance_parameters and only change "
-                    "parameters returned with modifiability=modifiable. The generic OpenAPI "
-                    "update path is intentionally blocked for this operation."
-                ),
-            )
-
-        validation_errors = {}
-        changes = []
-        effective_values = {}
-        high_risk_parameters = []
-        for name, new_value in values.items():
-            parameter = parameter_map[name]
-            error = _validate_parameter_value(parameter, new_value)
-            if error:
-                validation_errors[name] = {
-                    "message": error,
-                    "value": new_value,
-                    "value_range": parameter.get("value_range"),
-                    "type": parameter.get("type"),
-                }
-                continue
-            if str(parameter.get("value")) == new_value:
-                continue
-            risk_reasons = _parameter_risk_reasons(parameter)
-            change = {
-                "name": name,
-                "old_value": parameter.get("value"),
-                "new_value": new_value,
-                "value_range": parameter.get("value_range"),
-                "type": parameter.get("type"),
-                "restart_required": bool(parameter.get("restart_required")),
-                "risk_level": "high" if risk_reasons else "normal",
-                "risk_reasons": risk_reasons,
-            }
-            changes.append(change)
-            effective_values[name] = new_value
-            if risk_reasons:
-                high_risk_parameters.append(name)
-
-        if validation_errors:
-            raise McpToolError(
-                "MCP_INVALID_ARGS",
-                f"Parameter values failed local validation: {validation_errors}",
-                hint="Use the cloud-reported type and value_range from get_instance_parameters.",
-            )
         if not effective_values:
             return single_result(
                 {

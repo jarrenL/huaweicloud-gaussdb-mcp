@@ -40,6 +40,12 @@ jobs:
       - run: uv run ruff check src tests
       - run: uv run ruff format --check src tests
       - run: uv run mypy src tests
+      - name: Check GaussDB complexity and Pylint structural rules
+        if: matrix.package == 'server/mcp_server_gaussdb'
+        run: |
+          uv run ruff check scripts
+          uv run ruff format --check scripts
+          uv run python scripts/check_quality.py
       - run: uv run pytest --cov=src --cov-report=term-missing --cov-fail-under=${{ matrix.package == 'server/mcp_server_gaussdb' && 90 || 80 }}
       - run: uv build --out-dir "$RUNNER_TEMP/gaussdb-integration-build"
       - name: Validate the management Skill
