@@ -49,4 +49,4 @@ uv run mcp_server_rfs
 
 ## License
 
-MIT，详见 [LICENSE](LICENSE)。
+MIT。
