@@ -66,12 +66,12 @@ def pylint_results(root: Path) -> tuple[list[dict[str, Any]], int]:
 
 def main() -> int:
     package = Path(__file__).resolve().parents[1]
+    skill_scripts = (
+        package.parents[1] / "skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts"
+    )
+    roots = [package / "src", package / "tests", package / "scripts", skill_scripts]
     scores = sorted(
-        (
-            item
-            for name in ("src", "tests", "scripts")
-            for item in complexity_results(package / name)
-        ),
+        (item for root in roots for item in complexity_results(root)),
         reverse=True,
     )
     violations = [item for item in scores if item[0] > MAX_COMPLEXITY]

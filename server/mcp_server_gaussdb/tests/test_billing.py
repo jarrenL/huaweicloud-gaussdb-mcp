@@ -49,6 +49,7 @@ def response(status: int = 6, **info: Any) -> dict[str, Any]:
 
 class FakeBss(BssOrderClient):
     def __init__(self, pages: list[dict[str, Any]] | None = None) -> None:
+        super().__init__(settings=McpSettings())
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.pages = pages or [response()]
         self.read_error_after_cancel = False

@@ -27,6 +27,7 @@ METRIC = {
 
 class FakeCesClient(CesMonitoringClient):
     def __init__(self) -> None:
+        super().__init__(settings=McpSettings())
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.list_response: dict[str, Any] = {}
         self.batch_response: dict[str, Any] = {}

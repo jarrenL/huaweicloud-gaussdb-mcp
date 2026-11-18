@@ -41,37 +41,27 @@ def frontmatter(text: str) -> str | None:
     return None if end < 0 else text[4:end]
 
 
-def main() -> int:
-    """Run deterministic package checks and return a process exit code."""
-    root = Path(__file__).resolve().parents[1]
-    skill_file = root / "SKILL.md"
-    errors: list[str] = []
-
-    if root.name != SKILL_NAME:
-        errors.append(f"directory must be named {SKILL_NAME}")
-    if not skill_file.is_file():
-        errors.append("SKILL.md is missing")
-        return report(errors)
-
-    text = skill_file.read_text(encoding="utf-8")
+def _check_frontmatter(text: str, errors: list[str]) -> None:
     meta = frontmatter(text)
     if meta is None:
         errors.append("SKILL.md must start with YAML frontmatter")
-    else:
-        if not re.search(rf"(?m)^name:\s*{re.escape(SKILL_NAME)}\s*$", meta):
-            errors.append("frontmatter name must match the directory")
-        if not re.search(r"(?m)^description:\s*[|>]\s*$", meta):
-            errors.append("frontmatter description must be a multiline string")
-        if not re.search(r"(?m)^metadata:\s*$", meta):
-            errors.append("frontmatter metadata is missing")
-        if not re.search(r"(?m)^\s+version:\s*[\"']?1\.6\.0[\"']?\s*$", meta):
-            errors.append("metadata.version must be 1.6.0")
-        tags_match = re.search(r"(?m)^\s+tags:\s*\[([^]]*)\]\s*$", meta)
-        if not tags_match:
-            errors.append("metadata.tags is missing")
-        elif len([tag for tag in tags_match.group(1).split(",") if tag.strip()]) > 5:
-            errors.append("metadata.tags must contain no more than five tags")
+        return
+    if not re.search(rf"(?m)^name:\s*{re.escape(SKILL_NAME)}\s*$", meta):
+        errors.append("frontmatter name must match the directory")
+    if not re.search(r"(?m)^description:\s*[|>]\s*$", meta):
+        errors.append("frontmatter description must be a multiline string")
+    if not re.search(r"(?m)^metadata:\s*$", meta):
+        errors.append("frontmatter metadata is missing")
+    if not re.search(r"(?m)^\s+version:\s*[\"']?1\.6\.0[\"']?\s*$", meta):
+        errors.append("metadata.version must be 1.6.0")
+    tags_match = re.search(r"(?m)^\s+tags:\s*\[([^]]*)\]\s*$", meta)
+    if not tags_match:
+        errors.append("metadata.tags is missing")
+    elif len([tag for tag in tags_match.group(1).split(",") if tag.strip()]) > 5:
+        errors.append("metadata.tags must contain no more than five tags")
 
+
+def _check_documents(root: Path, text: str, errors: list[str]) -> None:
     for section in REQUIRED_SECTIONS:
         if not re.search(rf"(?m)^##+ {re.escape(section)}\s*$", text):
             errors.append(f"missing required section: {section}")
@@ -94,17 +84,21 @@ def main() -> int:
         if not reference_text.startswith("# "):
             errors.append(f"reference must start with H1: {reference.name}")
 
+
+def _check_smoke_script(root: Path, errors: list[str]) -> None:
     smoke_script = root / "scripts" / "smoke.py"
     if not smoke_script.is_file():
         errors.append("scripts/smoke.py is missing")
-    else:
-        try:
-            compile(smoke_script.read_text(encoding="utf-8"), str(smoke_script), "exec")
-        except SyntaxError as exc:
-            errors.append(f"scripts/smoke.py has invalid Python syntax: {exc}")
-        if not (smoke_script.stat().st_mode & 0o111):
-            errors.append("scripts/smoke.py must be executable")
+        return
+    try:
+        compile(smoke_script.read_text(encoding="utf-8"), str(smoke_script), "exec")
+    except SyntaxError as exc:
+        errors.append(f"scripts/smoke.py has invalid Python syntax: {exc}")
+    if not (smoke_script.stat().st_mode & 0o111):
+        errors.append("scripts/smoke.py must be executable")
 
+
+def _check_embedded_secrets(root: Path, errors: list[str]) -> None:
     for path in root.rglob("*"):
         if not path.is_file() or path.suffix not in {".md", ".py", ".json", ".yaml", ".yml"}:
             continue
@@ -112,6 +106,24 @@ def main() -> int:
         if SECRET_PATTERN.search(content):
             errors.append(f"possible embedded secret: {path.relative_to(root)}")
 
+
+def main() -> int:
+    """Run deterministic package checks and return a process exit code."""
+    root = Path(__file__).resolve().parents[1]
+    skill_file = root / "SKILL.md"
+    errors: list[str] = []
+
+    if root.name != SKILL_NAME:
+        errors.append(f"directory must be named {SKILL_NAME}")
+    if not skill_file.is_file():
+        errors.append("SKILL.md is missing")
+        return report(errors)
+
+    text = skill_file.read_text(encoding="utf-8")
+    _check_frontmatter(text, errors)
+    _check_documents(root, text, errors)
+    _check_smoke_script(root, errors)
+    _check_embedded_secrets(root, errors)
     return report(errors)
 
 

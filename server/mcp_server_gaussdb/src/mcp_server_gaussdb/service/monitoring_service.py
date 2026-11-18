@@ -136,6 +136,17 @@ def _valid_point(timestamp: Any, value: Any, start_ms: int, end_ms: int) -> bool
     return start_ms <= timestamp <= end_ms and math.isfinite(value)
 
 
+def _point_summary(points: list[dict[str, Any]]) -> dict[str, Any]:
+    values = [point["value"] for point in points]
+    return {
+        "minimum": min(values) if values else None,
+        "maximum": max(values) if values else None,
+        "aggregation_values_mean": math.fsum(values) / len(values) if values else None,
+        "latest_value": points[-1]["value"] if points else None,
+        "latest_timestamp": points[-1]["timestamp"] if points else None,
+    }
+
+
 def _series_item(
     metric: dict[str, Any],
     cloud: dict[str, Any],
@@ -150,7 +161,6 @@ def _series_item(
         if _valid_point(timestamp, value, start_ms, end_ms):
             points.append({"timestamp": timestamp, "value": value})
     points.sort(key=lambda point: point["timestamp"])
-    values = [point["value"] for point in points]
     return {
         **metric,
         "unit": cloud.get("unit"),
@@ -158,13 +168,7 @@ def _series_item(
         "datapoint_count": len(points),
         "datapoints": points[-max_points:],
         "datapoints_truncated": len(points) > max_points,
-        "summary": {
-            "minimum": min(values) if values else None,
-            "maximum": max(values) if values else None,
-            "aggregation_values_mean": math.fsum(values) / len(values) if values else None,
-            "latest_value": points[-1]["value"] if points else None,
-            "latest_timestamp": points[-1]["timestamp"] if points else None,
-        },
+        "summary": _point_summary(points),
         "observed_window": {
             "first_timestamp": points[0]["timestamp"] if points else None,
             "last_timestamp": points[-1]["timestamp"] if points else None,
