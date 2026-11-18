@@ -42,9 +42,6 @@ dev = [
   "radon>=6,<7",
 ]
 
-[tool.uv]
-override-dependencies = ["pyasn1>=0.6.4"]
-
 [tool.uv.sources]
 huaweicloud-mcp-core = { path = "../../libs/huaweicloud_mcp_core" }
 
