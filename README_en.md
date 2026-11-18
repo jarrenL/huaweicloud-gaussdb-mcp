@@ -16,6 +16,10 @@ Huawei Cloud MCP Server shared repository: provides MCP tools for each Huawei Cl
 - **[ECS Readonly MCP](server/mcp_server_ecs_readonly)**: Elastic Cloud Server readonly — read-only inventory of instance count / power status / flavor usage / running vCPUs & memory / public & private IPs, for periodic resource auditing scenarios.
 - **[ECS Lifecycle MCP](server/mcp_server_ecs_lifecycle)**: Elastic Cloud Server lifecycle — creation (prepaid/postpaid, smart defaults + user_data/EIP slots), modification, deletion, details / listing / async job queries, image / flavor / keypair discovery queries. All mutation tools enforce two-phase confirmation (preview first, `confirm=true` to execute), then re-check protection rules before execution — agents never act on their own.
 
+### Database
+
+- **[GaussDB MCP](server/mcp_server_gaussdb/README_en.md)**: Main capabilities include instance management, backups, parameter management, slow SQL analysis, and monitoring.
+
 ## Developer Documentation
 
 The complete development guide is available at [docs/development/](docs/development/README.md), split into 10 feature-focused documents: core package modular API, tool scenario methodology, service/client layers, guardrails, output & errors, three-tier testing, hands-on service creation from scratch, engineering & release. Reference implementation: `server/mcp_server_rfs/`; scaffold: `docs/development/template/`.

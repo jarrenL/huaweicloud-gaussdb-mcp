@@ -1,0 +1,300 @@
+# Huawei Cloud GaussDB MCP Server
+
+[中文说明](README.md)
+
+## Version
+
+Package: `mcp_huaweicloud_gaussdb`; current version: `0.8.1`; Python `3.10+`; MCP Python SDK `2.x`.
+
+## Overview
+
+This MCP server exposes Huawei Cloud GaussDB management APIs to AgentArts, OfficeACE connectors, and other MCP clients. It supports stdio and Streamable HTTP. The current scope is GaussDB only; DRS is excluded.
+
+## Quick start
+
+Prepare Python 3.10+, `uv`, and a Huawei Cloud credential with GaussDB read permissions. If
+`huaweicloud-devkit` is configured, the MCP automatically reuses
+`~/.config/huaweicloud/credentials.json`. Once the package is published on PyPI, start it in
+read-only mode:
+
+```bash
+export HUAWEICLOUD_MCP_READ_ONLY="true"
+uvx mcp_huaweicloud_gaussdb
+```
+
+Without devkit, set `HUAWEICLOUD_ACCESS_KEY`, `HUAWEICLOUD_SECRET_KEY`, and
+`HUAWEICLOUD_REGION` explicitly as before.
+
+Generic stdio client configuration:
+
+```json
+{
+  "mcpServers": {
+    "huaweicloud-gaussdb": {
+      "command": "uvx",
+      "args": ["mcp_huaweicloud_gaussdb"],
+      "env": {
+        "HUAWEICLOUD_MCP_READ_ONLY": "true"
+      }
+    }
+  }
+}
+```
+
+Call `discover_create_options` or `list_instances` first to validate region, permissions, and project discovery. See the later sections for source installation, hot-reloaded credentials, and remote deployment.
+
+## Category
+
+Database / cloud resource management / operations automation.
+
+## Main capabilities
+
+- Discover instance configurations and manage creation, deletion, resizing, capacity and restarts.
+- Create and inspect backups, manage backup policies and update instance parameters.
+- Analyze slow SQL, inspect CES monitoring metrics and track asynchronous jobs.
+- Inspect, pay or cancel eligible yearly/monthly GaussDB orders with BSS.
+- Reuse credentials and apply read-only mode, confirmation rules, masking and audit logs.
+
+## Main tools
+
+| Tool | Purpose | Risk | API documentation |
+|---|---|---|---|
+| `list_instances`, `get_instance` | Discover and inspect instances | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_328.html) |
+| `list_flavors` | Find valid specifications | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_084.html) |
+| `discover_create_options` | Discover all cloud prerequisites and a recommended create configuration | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `create_instance` | Provision an instance | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_017.html) |
+| `get_order` | Inspect GaussDB order amounts, status and paginated line items | READ | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00014.html) |
+| `pay_order` | Confirm and pay a GaussDB order after verifying exact cost and currency | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00030.html) |
+| `cancel_order` | Recheck and cancel an unpaid GaussDB order after confirmation | DANGEROUS | [BSS API](https://support.huaweicloud.com/api-oce/api_order_00017.html) |
+| `delete_instance` | Permanently delete an instance after confirmation and a cloud-side protection recheck | DANGEROUS | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `resize_instance`, `expand_instance`, `restart_instance` | Manage instance capacity and lifecycle | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_019.html) |
+| `get_instance_parameters`, `update_instance_parameters` | Inspect and update parameters | READ / WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `list_backups`, `get_backup_policy` | Inspect backups and policy | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_162.html) |
+| `create_manual_backup`, `configure_backup_policy` | Create a backup or update policy | WRITE | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `analyze_slow_sql` | Analyze performance using epoch-millisecond or timezone-aware ISO 8601 windows | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_297.html) |
+| `get_job`, `wait_job` | Inspect one job state or poll to a terminal state with a bounded timeout | READ | [GaussDB API](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) |
+| `list_monitoring_metrics` | Discover live monitoring metrics and full dimensions | READ | [CES API](https://support.huaweicloud.com/intl/en-us/api-ces/ces_03_0023.html) |
+| `query_monitoring_metrics` | Batch-query monitoring series and summaries | READ | [CES API](https://support.huaweicloud.com/intl/en-us/api-ces/ces_03_0034.html) |
+
+### Yearly/monthly orders
+
+In `create_instance.configuration.charge_info`, select `charge_mode="prePaid"`,
+`period_type="month"` (1-9) or `"year"` (1-3), and an integer `period_num`.
+Set `is_auto_pay=false` and `is_auto_renew=false` for an unpaid order without automatic renewal.
+Obtain authorization for the billing configuration and costs before submitting.
+
+If creation returns `order_id`, call `get_order` to inspect status, amounts, currency and line items.
+The default page has 20 lines; follow its marker. `amount_after_discount` excludes coupon/card
+deductions. Preserve the returned currency and measure ID. An unpaid order does not mean that an
+instance has been provisioned. Use `wait_job` when a job ID exists, then verify with `get_instance`.
+
+To abandon an unpaid order, obtain approval for its exact ID and call `cancel_order` with
+`confirm=true`. The service rechecks status, payment time, protection rules and all lines (up to
+1000), rejecting paid, non-GaussDB and mixed-product orders. Already-cancelled orders are idempotent.
+Check `cancellation_verified`; if false, query `get_order` instead of blindly resubmitting.
+
+BSS uses shared hot-reloaded AK/SK/STS with global credentials. Its default China endpoint is
+`https://bss.myhuaweicloud.com`, independent of the database region. Set `HUAWEICLOUD_BSS_ENDPOINT`
+for another billing site. Details require `billing:order:view`; cancellation needs the applicable
+order-update authorization for the account's policy model (such as legacy `bss:order:update`).
+Read-only mode blocks cancellation; confirmation, resource protection and audit remain enabled.
+After inspecting `get_order` and obtaining cost approval, call `pay_order` with the exact
+`order_id`, a decimal-string `expected_amount` (for example `"1248.00"`), the returned `currency`
+(for example `"CNY"`), and `confirm=true`. It checks every line and refreshes status, amount and
+protection immediately before submitting one BSS SDK payment request, without automatic retries.
+Cancelled/non-payable and mixed-product orders are rejected; processing/completed orders return
+their existing state without another payment. Payment requires `billing:order:pay` plus read access.
+BSS applies its cash/credit-account balance rules.
+
+The tool does not select coupons or additional discounts. Both `official_amount` and
+`amount_after_discount` must match the approved amount; discounted orders use the billing console
+to avoid silently losing a discount. Managed accounts may receive automatic cloud-side benefits;
+the bill determines the actual cash deduction. `expected_amount` is a preflight check, not an atomic
+charge cap, because BSS does not accept that field. Order amount changes found after submission
+produce a warning. The process serializes payments; BSS remains authoritative across processes.
+
+Check `payment_submitted` and `payment_verified`. A lost response may leave submission unknown
+(`payment_submitted=null`); inspect the same order before any retry. Payment acceptance does not mean
+the instance is ready: track `get_order`, then verify `get_instance`. Refunds, unsubscription and
+pre-purchase pricing use separate billing capabilities.
+`confirm=true` is a tool argument, not server-verified human approval; the agent client owns its UI.
+
+### CES monitoring
+
+1. Call `get_instance` for topology. Discover instance metrics with instance_id only, node metrics
+   with an actual node_id, then component metrics with both node_id and a DN/CN component_id.
+   Follow markers separately at each level. CES does not expand partial dimensions or wildcard IDs.
+2. Pass selected items, including their complete ordered `dimensions`, to `query_monitoring_metrics`.
+   The tool normalizes CES dimension order to instance, node, then component.
+3. Use epoch milliseconds or timezone-aware ISO 8601 and select a period and aggregation. Up to
+   20 series are queried per call, with the latest 20 displayed points per series by default.
+   Summaries use all received in-window samples. Queries over the CES 3000-point budget are
+   rejected with instructions to narrow the window, increase the period or split the batch.
+
+Existing AK/SK, STS, region and Project ID are reused. Grant `ces:metrics:list` and
+`ces:metricData:list` separately; GaussDB permissions alone do not grant CES access. Empty series
+are marked `no_data`, never zero or healthy. `HUAWEICLOUD_CES_ENDPOINT` optionally overrides the
+SDK regional endpoint. See [GaussDB metrics and collection constraints](https://support.huaweicloud.com/intl/en-us/usermanual-gaussdb/gaussdb_01_238.html).
+
+The [metric reference (Chinese)](../../skills/database/gaussdb/huawei-cloud-gaussdb-manage/references/monitoring-metrics.md)
+explains 58 observed metrics, their units, dimension levels and interpretation. Discover available
+metrics at runtime for each instance; the reference is not a fixed availability list.
+
+### Creation choices
+
+Call `discover_create_options` first. Its MCP schema exposes `product_type` (`basic`, `enterprise`, or `ecology`), centralized `deployment_mode` (`single`, `triset`, or `logger`), distributed basic `combined`, distributed enterprise/ecology `hws`, and `ha_mode` (`centralization_standard` or `enterprise`). If deployment mode is omitted, the service derives it from the topology and product type.
+
+The default is `basic + centralization_standard + single`, represented as `ha.instance_mode=basic`, `replica_num=1`, and one AZ entry. Single replica has no HA or SLA and is intended for development and functional testing. Production callers should explicitly select `triset` or a reviewed `logger` path.
+
+The response separates common, centralized-only, and distributed-only parameters. Deployment templates, flavors, storage types, and AZs are queried for the active region and selected engine version. No regional flavor count or code is embedded in the server. `available_flavor_count`, `available`, and `flavors_truncated` describe each live result. Distributed basic queries the `combined` flavor family; distributed enterprise queries `enterprise`. For distributed modes, `availability_semantics=catalog_candidate` means the catalog has candidates, while Huawei Cloud still performs the final region, tenant, engine, and product binding check during creation.
+
+The public v3.2 create request has no `solution` selector, so `logger` is live-discoverable but marked `direct_create_supported=false`; `create_instance` refuses to silently turn it into `triset`.
+
+### Parameter update safety
+
+`update_instance_parameters` always refreshes the instance's live parameter metadata through the current v3.2 API before a write. Unknown parameters and any parameter not explicitly returned with `readonly=false` are blocked. Each item reports `modifiable`, `read_only`, or `unknown`. The response previews old/new values, type, range, restart impact, and risk reasons. Clear boolean, numeric, enum, and range constraints are checked locally, with Huawei Cloud remaining the final validator. Restart-requiring or sensitive durability, security, replication, audit, memory, and connection-limit changes require a second call with `confirm=true`. Use `get_instance_parameters(modifiable_only=true)` to list only currently modifiable parameters.
+
+### Backup policy
+
+- `period` is a weekday list such as `1,3,5`. `differential_period` is a differential-backup interval in minutes and accepts only `15`, `30`, `60`, `180`, `360`, `720`, or `1440`.
+- The read API returns `differential_period` as an integer while the generated write SDK model declares a string. The server normalizes reads to an integer and converts writes internally, so callers can pass a read value back directly.
+- The deprecated cloud response spelling `differential_priod` is normalized to `differential_period`.
+- When `differential_period` is omitted, the server reads the current policy and preserves its value automatically. This keeps the optional MCP input compatible with distributed instances, where the cloud API requires the field on update.
+
+See the [GaussDB API overview](https://support.huaweicloud.com/api-gaussdb/gaussdb_api_007.html) and [permissions](https://support.huaweicloud.com/intl/en-us/api-gaussdb/gaussdb_api_188.html).
+
+## Usage Guide
+
+### Prerequisites
+
+- Python 3.10 or later and [uv](https://docs.astral.sh/uv/) for UVX.
+- A least-privilege IAM user with GaussDB API permissions.
+- A Huawei Cloud region and AK/SK, preferably temporary credentials in production.
+
+### Installation
+
+After PyPI publication:
+
+```bash
+uvx mcp_huaweicloud_gaussdb
+```
+
+or:
+
+```bash
+pip install mcp_huaweicloud_gaussdb
+mcp_huaweicloud_gaussdb
+```
+
+Run from a checkout that contains the GaussDB service:
+
+```bash
+cd /absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb
+uv sync --frozen
+uv run mcp_huaweicloud_gaussdb
+```
+
+Source-checkout client configuration (also works with this integration branch before upstream merge):
+
+```json
+{
+  "mcpServers": {
+    "huaweicloud-gaussdb": {
+      "command": "uv",
+      "args": ["run", "--directory", "/absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb", "mcp_huaweicloud_gaussdb"],
+      "env": {"HUAWEICLOUD_MCP_READ_ONLY": "true"}
+    }
+  }
+}
+```
+
+## Configuration
+
+Credential identities resolve in this order: explicit environment variables, the MCP file
+named by `HUAWEICLOUD_MCP_CREDENTIALS_FILE`, then the devkit S1 file at
+`~/.config/huaweicloud/credentials.json`. The S1 keys `ak`, `sk`, `securityToken`, and `region`
+map to the corresponding MCP settings. Override its path with
+`HUAWEICLOUD_DEVKIT_CREDENTIALS_FILE`, or disable reuse with
+`HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS=1`. `HUAWEICLOUD_PROJECT_ID` remains optional and is
+discovered through IAM when omitted; project and domain IDs are not read from devkit.
+
+Project discovery uses `https://iam.myhuaweicloud.com` by default. Override it with `HUAWEICLOUD_IAM_ENDPOINT` for another Huawei Cloud partition or IAM endpoint.
+
+For MCP-managed hot reload, set `HUAWEICLOUD_MCP_CREDENTIALS_FILE` to a mode-`0600` JSON file containing `access_key`, `secret_key`, `region`, and optional `project_id`, `domain_id`, and `security_token`. The devkit-owned file does not receive the MCP `0600` check, but must still be a regular JSON object. Both sources are re-read for every tool invocation.
+
+Set `HUAWEICLOUD_MCP_READ_ONLY=true` to block writes. Use `HUAWEICLOUD_MCP_GUARDRAILS_CONFIG` for YAML rules and `HUAWEICLOUD_MCP_AUDIT_FILE` for an optional JSONL audit file. See the files under `examples/` and the [Chinese guide](README.md) for the full variable table and protection-boundary notes.
+
+## Run with UVX
+
+```json
+{
+  "mcpServers": {
+    "huaweicloud-gaussdb": {
+      "command": "uvx",
+      "args": ["mcp_huaweicloud_gaussdb"],
+      "env": {
+        "HUAWEICLOUD_MCP_READ_ONLY": "true"
+      }
+    }
+  }
+}
+```
+
+AgentArts supports UVX stdio and Streamable HTTP. See [Custom MCP access](https://support.huaweicloud.com/usermanual-agentarts0/agentarts_05_0136.html). To run remotely:
+
+```bash
+mcp_huaweicloud_gaussdb -t streamable-http
+```
+
+The default endpoint is `http://127.0.0.1:8000/mcp`. Put public deployments behind HTTPS and client authentication.
+
+## Examples
+
+A safe resize flow is: inspect the instance, list flavors, create and verify a backup, resize, then poll `get_job` until the asynchronous operation reaches a terminal state. If a guardrail requests confirmation, repeat the write call with `confirm=true` after review.
+
+## Client compatibility
+
+| Client or platform | Transport | Notes |
+|---|---|---|
+| AgentArts | UVX stdio / Streamable HTTP | Adapt the files under `examples/` |
+| OfficeACE and CodeArts MCP Marketplace | Platform-supported stdio / Streamable HTTP | Listing fields and publication status follow each platform's process |
+| Desktop clients such as Claude Desktop | stdio | The client must support `command`, `args`, and `env` configuration |
+| Other standard MCP clients | stdio / Streamable HTTP | The remote endpoint is `/mcp` |
+
+The server does not expose legacy SSE. It manages GaussDB cloud resources and does not open SQL sessions, execute arbitrary SQL, or provide natural-language-to-SQL features.
+
+## Permissions
+
+- Read-only discovery needs the GaussDB query APIs plus VPC, subnet, and security-group reads used by create-option discovery.
+- Grant write permissions only for the enabled create, backup, resize, expansion, restart, or parameter tools.
+- Prefer a separate principal or temporary grant for deletion, order payment and order cancellation, together with MCP confirmation rules.
+- Project auto-discovery requires IAM project-query permission. Supplying `HUAWEICLOUD_PROJECT_ID` avoids discovering another project for the selected region.
+
+Map permissions to each enabled API using the official [permissions reference](https://support.huaweicloud.com/intl/en-us/api-gaussdb/gaussdb_api_188.html). Do not configure a long-lived administrator credential merely for convenience.
+
+## Development, testing, and release
+
+```bash
+# From the repository root:
+bash scripts/test.sh gaussdb
+uv run --directory server/mcp_server_gaussdb python scripts/check_quality.py
+uv build --directory server/mcp_server_gaussdb
+```
+
+Default tests do not access cloud resources. Live validation must be explicitly enabled in a dedicated test account. Any billable resource must be cleaned up on failure as well as success, and its deletion job must reach a terminal state. Before release, also verify wheel metadata, installation in a clean Python 3.10 environment, the MCP tool list, and the absence of credentials or resource identifiers in deliverables.
+
+The quality gate requires every GaussDB source, test and script function to have cyclomatic complexity below 20. It also blocks source Pylint errors, unidiomatic type checks and structural findings such as excessive boolean expressions or branches. Ruff remains the style checker.
+
+## Contributing and support
+
+See `CONTRIBUTING.md` and `SECURITY.md` in the repository root. Use the GitHub issue templates for regular bugs and feature requests. Never disclose credentials or vulnerabilities in public issues.
+
+## License
+
+MIT License.
+
+### Security and reliability
+
+See [security and reliability notes](SECURITY.md) for atomic credential selection, write protection, error handling, bounded auditing, SDK deadlines and HTTP access requirements in 0.8.1.
+
+AK/SK and optional STS token are selected together from one source; partial identities fail closed. Region remains independently overridable. Public HTTP binds require `HUAWEICLOUD_MCP_HTTP_TOKEN` (32+ characters) and exact `MCP_SERVER_ALLOWED_HOSTS`, with `MCP_SERVER_ALLOWED_ORIGINS` for browser callers. Send the MCP token in every Authorization Bearer header through an HTTPS gateway. This shared-token access gate is separate from cloud AK/SK and does not provide OAuth discovery or human approval. Auto-pay/auto-renew must stay disabled; use the separately approved order payment workflow.

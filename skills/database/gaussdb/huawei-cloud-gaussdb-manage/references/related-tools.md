@@ -1,0 +1,98 @@
+# MCP 工具参考
+
+## 概述
+
+兼容的 MCP Server 当前至少暴露 23 个场景工具。以下参数仅列出
+Agent 编排时最需要的部分；实际版本、工具数量和调用参数以 MCP 运行时返回为准。
+
+## 实例与创建
+
+| 工具 | 关键参数 | 关键约束 |
+|---|---|---|
+| `list_instances` | `name`, `limit`, `marker` | `name` 为精确名称筛选；使用 marker 分页 |
+| `get_instance` | `instance_id` | 返回拓扑、网络、存储、标签和慢 SQL 所需 `node_ids` |
+| `list_flavors` | `version`, `ha_mode`, `limit`, `marker` | `ha_mode` 可为 `centralization_standard`、`enterprise`、`combined` |
+| `discover_create_options` | `ha_mode`, `deployment_mode`, `product_type`, `version`, `limit` | 实时发现版本、规格、AZ、VPC、子网和安全组 |
+| `create_instance` | `configuration`, `confirm` | 异步、可能计费；密码不得回显；`logger` 不能直接创建 |
+| `delete_instance` | `instance_id`, `confirm` | 永久删除，必须 `confirm=true`，并进行云端二次保护检查 |
+| `resize_instance` | `instance_id`, `flavor_ref`, `is_auto_pay`, `confirm` | `flavor_ref` 必须来自实时规格查询 |
+| `expand_instance` | `instance_id` 与一个扩容维度 | `new_volume_size_gb`、`coordinator_az_codes`、`dn_shard_count` 三选一 |
+| `restart_instance` | `instance_id`, `confirm` | 中断现有连接；先核对实例和维护窗口 |
+
+创建枚举：
+
+- `product_type`: `basic`, `enterprise`, `ecology`
+- `ha_mode`: `centralization_standard`（集中式）或 `enterprise`（分布式创建模式）
+- `deployment_mode`: `single`, `triset`, `logger`, `combined`, `hws`
+
+基础版分布式的规格族由服务自动映射为 `combined`；企业版/生态版分布式使用 `hws` 候选。
+这些值只表达产品组合，是否可售仍由实时返回和创建接口决定。
+
+## 包周期订单
+
+| 工具 | 关键参数 | 关键约束 |
+|---|---|---|
+| `get_order` | `order_id`, `limit=20`, `marker` | GaussDB 订单详情、金额、币种、状态和分页明细；READ |
+| `pay_order` | `order_id`, `expected_amount`, `currency`, `confirm=false` | DANGEROUS；核对准确金额和币种，只支付未选券/折扣的待支付 GaussDB 订单；不自动重试 |
+| `cancel_order` | `order_id`, `confirm=false` | DANGEROUS；只取消未付款的 GaussDB 订单，复查全部明细，拒绝混合产品订单 |
+
+创建返回订单号时先查 `get_order`；返回任务号时才用 `wait_job`。取消需精确资源授权，
+确认后传 `confirm=true`，检查 `cancellation_verified` 并继续查询直到状态为 `cancelled`。
+状态码 6 为待支付，4 为已取消，3 为处理中，5 为已完成；不能把订单受理当作实例开通。
+付款前查询并取得对准确总额和币种的授权，金额用十进制字符串；订单原价和优惠后金额必须
+都等于授权金额。`expected_amount` 只用于提交前检查，不作为 BSS 原子扣款上限。
+付款需 `billing:order:pay`。`payment_submitted=null` 表示结果未知，先查询，不能盲目重试。
+检查 `payment_verified` 并在开通后验证实例；已支付资源的退订走独立计费流程。
+
+## 参数、备份与诊断
+
+| 工具 | 关键参数 | 关键约束 |
+|---|---|---|
+| `get_instance_parameters` | `instance_id`, `name`, `modifiable_only`, `limit`, `marker` | 修改前必须调用；返回只读、值域、重启和风险元数据 |
+| `update_instance_parameters` | `instance_id`, `values`, `confirm` | 1-100 个字符串值；敏感/需重启参数需要二次确认 |
+| `list_backups` | `instance_id`, `backup_type`, `begin_time`, `end_time`, `limit`, `marker` | 时间范围使用 API 接受的 ISO 8601 格式 |
+| `create_manual_backup` | `instance_id`, `name`, `description`, `confirm` | 名称 4-64 字符且字母开头；异步 |
+| `get_backup_policy` | `instance_id` | 修改前读取当前策略 |
+| `configure_backup_policy` | `instance_id`, `keep_days`, `start_time`, `period`, `differential_period`, `confirm` | `keep_days` 1-732；时间窗为 UTC；差量周期单位为分钟 |
+| `analyze_slow_sql` | `instance_id`, `node_ids`, `start_time`, `end_time`, `threshold`, `limit` | 时间是 Unix 毫秒或带时区 ISO 8601；SQL 文本按敏感数据处理 |
+| `get_job` | `job_id` | 跟踪创建、备份、变更、扩容、重启和参数任务 |
+| `wait_job` | `job_id`, `timeout_seconds`, `poll_interval_seconds` | 最多等待 1800 秒；本地超时后继续等待同一任务，不重复提交写操作 |
+
+## CES 监控
+
+指标的中文含义、单位与读数注意点见 [监控指标参考](monitoring-metrics.md)。
+
+| 工具 | 关键参数 | 关键约束 |
+|---|---|---|
+| `list_monitoring_metrics` | `instance_id`, `metric_name`, `node_id`, `component_id`, `limit`, `marker` | 实时发现；组件筛选需要节点；保留完整维度和 marker |
+| `query_monitoring_metrics` | `instance_id`, `metrics`, `start_time`, `end_time`, `period`, `aggregation`, `max_points` | 每批 1-20 条真实序列；默认最近 20 点；无数据不视作零 |
+
+发现按精确层级查询：instance_id 对应实例层；加真实 node_id 对应节点层；再加 component_id
+对应组件层。先用 get_instance 取拓扑；不要用星号或假定实例层包含下层。
+`metrics` 可直接复用发现结果条目。namespace 为 `SYS.GAUSSDBV5`；实例、节点和组件维度依次为
+`gaussdbv5_instance_id`、`gaussdbv5_node_id`、`gaussdbv5_component_id`，使用每条指标实际返回的
+层级。period 可为 `1`、`60`、`300`、`1200`、`3600`、`14400`、`86400`；`1` 表示原始值，
+aggregation 强制为 average。`max_points` 为 1-100，摘要不受显示截断影响。
+
+## 跨服务工具
+
+购买前报价使用独立的 BSS/计费连接器：
+
+| 任务 | BSS 操作 | 约束 |
+|---|---|---|
+| 按需询价 | `ListOnDemandResourceRatings` | 商品编码和度量单位来自 BSS 目录 |
+| 包年/包月询价 | `ListRateOnPeriodDetail` | 按真实购买期限查询 |
+| 账户余额 | `ShowCustomerAccountBalances` | 客户自身凭证及 `billing:balance:view` |
+
+没有 BSS 连接器或权限时停止自动报价。
+
+## 常见错误
+
+✅ 正确：先用 `discover_create_options` 得到 `spec_code` 和 AZ，再构造创建配置。
+
+❌ 错误：把北京四查询到的规格码用于贵阳一，或假设所有区域支持同样的数据库版本。
+
+✅ 正确：将 `get_backup_policy` 返回的差量周期整数传给 `configure_backup_policy`。
+
+❌ 错误：把 `differential_period` 当作星期字符串，或将云端历史拼写
+`differential_priod` 传给写工具。

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "huaweicloud-gaussdb": {
+      "type": "streamable_http",
+      "url": "https://REPLACE_WITH_PUBLIC_HOST/mcp",
+      "headers": {
+        "Authorization": "Bearer REPLACE_WITH_MCP_ACCESS_TOKEN"
+      }
+    }
+  }
+}

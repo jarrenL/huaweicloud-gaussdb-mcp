@@ -1,0 +1,20 @@
+rules:
+  - id: block-protected-instance
+    action: block
+    message: This instance is protected from MCP changes.
+    match:
+      risks: [WRITE, DANGEROUS]
+      resources:
+        ids: [REPLACE_WITH_PROTECTED_INSTANCE_ID]
+
+  - id: confirm-disruptive-writes
+    action: confirm
+    message: Review the maintenance window and affected instance before proceeding.
+    match:
+      tools: [resize_instance, expand_instance, restart_instance, update_instance_parameters]
+
+  - id: warn-instance-creation
+    action: warn
+    message: Instance creation can incur charges.
+    match:
+      tools: [create_instance]
