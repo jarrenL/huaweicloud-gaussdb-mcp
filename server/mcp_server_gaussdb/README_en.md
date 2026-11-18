@@ -287,14 +287,12 @@ The quality gate requires every GaussDB source, test and script function to have
 
 ## Contributing and support
 
-See `CONTRIBUTING.md` and `SECURITY.md` in the repository root. Use the GitHub issue templates for regular bugs and feature requests. Never disclose credentials or vulnerabilities in public issues.
+See `CONTRIBUTING.md` and the [security policy](../../SECURITY_en.md) in the repository root. Use the GitHub issue templates for regular bugs and feature requests. Never disclose credentials or vulnerabilities in public issues.
 
 ## License
 
 MIT License.
 
 ### Security and reliability
-
-See [security and reliability notes](SECURITY.md) for atomic credential selection, write protection, error handling, bounded auditing, SDK deadlines and HTTP access requirements in 0.8.1.
 
 AK/SK and optional STS token are selected together from one source; partial identities fail closed. Region remains independently overridable. Public HTTP binds require `HUAWEICLOUD_MCP_HTTP_TOKEN` (32+ characters) and exact `MCP_SERVER_ALLOWED_HOSTS`, with `MCP_SERVER_ALLOWED_ORIGINS` for browser callers. Send the MCP token in every Authorization Bearer header through an HTTPS gateway. This shared-token access gate is separate from cloud AK/SK and does not provide OAuth discovery or human approval. Auto-pay/auto-renew must stay disabled; use the separately approved order payment workflow.

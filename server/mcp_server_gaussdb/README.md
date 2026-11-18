@@ -382,12 +382,8 @@ uv build --directory server/mcp_server_gaussdb
 
 ## 贡献和支持
 
-贡献流程和安全报告方式见仓库根目录的 `CONTRIBUTING.md` 和 `SECURITY.md`。普通问题可使用 GitHub Issue 模板；凭证泄露和安全问题不得提交到公开 Issue。
+贡献流程和安全报告方式见仓库根目录的 `CONTRIBUTING.md` 和[安全策略](../../SECURITY.md)。普通问题可使用 GitHub Issue 模板；凭证泄露和安全问题不得提交到公开 Issue。
 
 ## 许可证
 
 MIT License。
-
-### 安全与可靠性
-
-版本 0.8.1 的凭证成套选择、变更保护、异常脱敏、审计容量及 HTTP 接入要求见 [安全与可靠性说明](SECURITY.md)。
