@@ -240,6 +240,28 @@ async def test_tool_error_from_execution_is_wrapped() -> None:
     assert payload["error"]["hint"] == "retry"
 
 
+@pytest.mark.parametrize("use_structured_content", [False, True])
+async def test_returned_error_uses_structured_content_before_json_text(
+    use_structured_content: bool,
+) -> None:
+    middleware = _middleware()
+    text_error = {"code": "TEXT_ERROR", "request_id": "text-request"}
+    structured_error = {"code": "STRUCTURED_ERROR", "request_id": "structured-request"}
+    tool_result = CallToolResult(
+        content=[TextContent(type="text", text=json.dumps({"error": text_error}))],
+        structured_content={"error": structured_error} if use_structured_content else None,
+    )
+
+    result = await middleware(_tool_ctx("list_widgets", {}), _make_call_next(tool_result))
+
+    assert result.is_error is True
+    expected = structured_error if use_structured_content else text_error
+    record = middleware._audit.events[-1]
+    assert record["error_code"] == expected["code"]
+    assert record["request_id"] == expected["request_id"]
+    assert record["decision"] == record["outcome"] == "failed"
+
+
 async def test_dict_result_is_masked_directly() -> None:
     middleware = _middleware()
     outcome = {"secret_key": "abcdef", "value": 1}

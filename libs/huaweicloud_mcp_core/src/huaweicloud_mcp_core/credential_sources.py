@@ -28,7 +28,7 @@ def _read_json_object(
             if require_private_permissions and os.name != "nt" and mode & 0o077:
                 raise ValueError("file must be regular with mode 0600 or stricter")
             value = json.load(stream)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         permission_hint = (
             " and mode 0600" if require_private_permissions and os.name != "nt" else ""
         )

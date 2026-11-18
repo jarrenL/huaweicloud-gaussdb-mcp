@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import threading
 import time
@@ -287,12 +286,7 @@ class GuardrailsMiddleware:
         return self._masking.mask_text(text)
 
     def _error_result(self, error: McpToolError) -> CallToolResult:
-        payload = error.to_dict()
-        return CallToolResult(
-            content=[TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))],
-            structured_content=payload,
-            is_error=True,
-        )
+        return _wrap_error_payload(error.to_dict())
 
     def _confirm_result(self, hits: list[RuleHit]) -> CallToolResult:
         strictest = strictest_hit(hits)
@@ -321,29 +315,18 @@ class GuardrailsMiddleware:
     ) -> Any:
         # Every exit path, including pre-check and unexpected exceptions, is sanitized.
         result = self._post_process(result, [])
-        payload: Any = result
-        if isinstance(result, CallToolResult):
-            payload = result.structured_content
-            if payload is None:
-                for block in result.content:
-                    if isinstance(block, TextContent):
-                        with contextlib.suppress(json.JSONDecodeError):
-                            payload = json.loads(block.text)
-                        break
-        if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
-            error_code = str(payload["error"].get("code") or "MCP_SDK_ERROR")
+        payload = _result_payload(result)
+        error = payload.get("error") if isinstance(payload, dict) else None
+        request_id = None
+        if isinstance(error, dict):
+            error_code = str(error.get("code") or "MCP_SDK_ERROR")
+            request_id = error.get("request_id")
             if decision in {"allowed", "warned"}:
                 decision = "failed"
             if isinstance(result, CallToolResult):
                 result.is_error = True
             else:
-                result = CallToolResult(
-                    content=[
-                        TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))
-                    ],
-                    structured_content=payload,
-                    is_error=True,
-                )
+                result = _wrap_error_payload(payload)
         elif isinstance(result, CallToolResult) and result.is_error:
             error_code = error_code or "MCP_SDK_ERROR"
             decision = "failed"
@@ -358,9 +341,7 @@ class GuardrailsMiddleware:
             params=arguments,
             duration_ms=int((time.monotonic() - started) * 1000),
             error_code=error_code,
-            request_id=payload.get("error", {}).get("request_id")
-            if isinstance(payload, dict) and isinstance(payload.get("error"), dict)
-            else None,
+            request_id=request_id,
             outcome="failed"
             if error_code
             else "confirmation_required"
@@ -368,6 +349,28 @@ class GuardrailsMiddleware:
             else "succeeded",
         )
         return result
+
+
+def _result_payload(result: Any) -> Any:
+    if not isinstance(result, CallToolResult):
+        return result
+    if result.structured_content is not None:
+        return result.structured_content
+    for block in result.content:
+        if isinstance(block, TextContent):
+            try:
+                return json.loads(block.text)
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def _wrap_error_payload(payload: dict[str, Any]) -> CallToolResult:
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(payload, ensure_ascii=False))],
+        structured_content=payload,
+        is_error=True,
+    )
 
 
 def _warnings_payload(warn_hits: list[RuleHit]) -> list[dict[str, str]]:

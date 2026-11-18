@@ -63,30 +63,33 @@ class AuditLogger:
         return self._file_path
 
     def _build_record(self, **event: Any) -> dict[str, Any]:
-        record: dict[str, Any] = {
+        raw_record: dict[str, Any] = {
             "ts": _utc_timestamp(),
             "event": "tool_call",
         }
-        record.update(event)
-        record = _trim_params(self._masking.mask(_trim_params(record, trim_strings=False)))
-        if len(json.dumps(record, ensure_ascii=False, default=str).encode()) > 16 * 1024:
-            record = {
-                key: record[key]
-                for key in (
-                    "ts",
-                    "event",
-                    "tool",
-                    "risk",
-                    "decision",
-                    "outcome",
-                    "error_code",
-                    "request_id",
-                    "duration_ms",
-                )
-                if key in record
-            }
-            record["params"] = {"_truncated": True, "reason": "audit_size_limit"}
-        return record
+        raw_record.update(event)
+        masked_record: dict[str, Any] = _trim_params(
+            self._masking.mask(_trim_params(raw_record, trim_strings=False))
+        )
+        if len(json.dumps(masked_record, ensure_ascii=False, default=str).encode()) <= 16 * 1024:
+            return masked_record
+        compact_record: dict[str, Any] = {
+            key: masked_record[key]
+            for key in (
+                "ts",
+                "event",
+                "tool",
+                "risk",
+                "decision",
+                "outcome",
+                "error_code",
+                "request_id",
+                "duration_ms",
+            )
+            if key in masked_record
+        }
+        compact_record["params"] = {"_truncated": True, "reason": "audit_size_limit"}
+        return compact_record
 
     def emit(self, **event: Any) -> None:
         record = self._build_record(**event)
@@ -98,7 +101,7 @@ class AuditLogger:
             try:
                 print(line, file=sys.stderr)
                 if self._file_path:
-                    self._write_file((line + "\n").encode("utf-8"))
+                    self._write_file(self._file_path, (line + "\n").encode("utf-8"))
             except OSError:
                 self.file_errors += 1
                 fallback = json.dumps(
@@ -108,10 +111,9 @@ class AuditLogger:
                 with contextlib.suppress(OSError):
                     print(fallback, file=sys.stderr)
 
-    def _write_file(self, data: bytes) -> None:
-        assert self._file_path is not None
+    def _write_file(self, file_path: str, data: bytes) -> None:
         flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(self._file_path, flags, 0o600)
+        descriptor = os.open(file_path, flags, 0o600)
         try:
             info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode) or (os.name != "nt" and info.st_mode & 0o077):
@@ -120,10 +122,10 @@ class AuditLogger:
                 os.close(descriptor)
                 descriptor = -1
                 for index in range(self._backup_count, 0, -1):
-                    source = self._file_path if index == 1 else f"{self._file_path}.{index - 1}"
+                    source = file_path if index == 1 else f"{file_path}.{index - 1}"
                     if os.path.lexists(source):
-                        os.replace(source, f"{self._file_path}.{index}")
-                descriptor = os.open(self._file_path, flags, 0o600)
+                        os.replace(source, f"{file_path}.{index}")
+                descriptor = os.open(file_path, flags, 0o600)
             with os.fdopen(descriptor, "ab", closefd=False) as handle:
                 handle.write(data)
         finally:
