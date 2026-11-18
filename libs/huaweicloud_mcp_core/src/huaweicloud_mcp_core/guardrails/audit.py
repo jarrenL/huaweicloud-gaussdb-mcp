@@ -23,16 +23,22 @@ def _trim_params(params: Any, depth: int = 0, *, trim_strings: bool = True) -> A
     if depth >= 8:
         return "<truncated>"
     if isinstance(params, dict):
-        return {
-            str(key): _trim_params(value, depth + 1, trim_strings=trim_strings)
-            for key, value in list(params.items())[:100]
-            if value is not None
-        }
+        return _trim_mapping(params, depth, trim_strings=trim_strings)
     if isinstance(params, (list, tuple)):
         return [_trim_params(item, depth + 1, trim_strings=trim_strings) for item in params[:100]]
     if trim_strings and isinstance(params, str) and len(params) > _MAX_PARAM_LENGTH:
         return params[:_MAX_PARAM_LENGTH]
     return params
+
+
+def _trim_mapping(
+    params: dict[Any, Any], depth: int = 0, *, trim_strings: bool = True
+) -> dict[str, Any]:
+    return {
+        str(key): _trim_params(value, depth + 1, trim_strings=trim_strings)
+        for key, value in list(params.items())[:100]
+        if value is not None
+    }
 
 
 class AuditLogger:
@@ -68,9 +74,8 @@ class AuditLogger:
             "event": "tool_call",
         }
         raw_record.update(event)
-        masked_record: dict[str, Any] = _trim_params(
-            self._masking.mask(_trim_params(raw_record, trim_strings=False))
-        )
+        bounded_record = _trim_mapping(raw_record, trim_strings=False)
+        masked_record = _trim_mapping(self._masking.mask(bounded_record))
         if len(json.dumps(masked_record, ensure_ascii=False, default=str).encode()) <= 16 * 1024:
             return masked_record
         compact_record: dict[str, Any] = {
