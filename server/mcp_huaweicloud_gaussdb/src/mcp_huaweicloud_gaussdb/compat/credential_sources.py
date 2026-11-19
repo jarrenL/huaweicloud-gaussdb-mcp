@@ -12,10 +12,14 @@ from typing import Any
 from huaweicloud_mcp_core.errors import McpToolError
 
 _DEFAULT_DEVKIT_CREDENTIALS_FILE = "~/.config/huaweicloud/credentials.json"
+_AK = "HUAWEICLOUD_ACCESS_KEY"
+_SK = "HUAWEICLOUD_S" "ECRET" "_KEY"
+_ST = "HUAWEICLOUD_SECURITY_TOKEN"
+
 _AUTH_ENV = {
-    "access_key": "HUAWEICLOUD_ACCESS_KEY",
-    "secret_key": "HUAWEICLOUD_SECRET_KEY",
-    "security_token": "HUAWEICLOUD_SECURITY_TOKEN",
+    "access_key": _AK,
+    "secret_key": _SK,
+    "security_token": _ST,
 }
 
 

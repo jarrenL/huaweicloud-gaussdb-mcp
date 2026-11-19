@@ -3,7 +3,9 @@
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from huaweicloud_mcp_core.errors import McpToolError
+from huaweicloud_mcp_core.guardrails.rules import Rule
 from huaweicloud_mcp_core.security import ToolRisk, get_tool_risk, tool_supports_confirm
 
 from mcp_huaweicloud_gaussdb.compat.guardrails.audit import AuditLogger
@@ -156,11 +158,18 @@ async def test_read_only_middleware_blocks_write() -> None:
     assert called is False
 
 
-async def test_dangerous_tool_requires_confirmation() -> None:
-    middleware = GuardrailsMiddleware(read_only=False, rules=[], audit=AuditLogger())
+@pytest.mark.parametrize(
+    ("tool_name", "rules"),
+    [
+        ("delete_instance", []),
+        ("restart_instance", [Rule(id="confirm-restart", action="confirm")]),
+    ],
+)
+async def test_middleware_requires_confirmation(tool_name: str, rules: list[Rule]) -> None:
+    middleware = GuardrailsMiddleware(read_only=False, rules=rules, audit=AuditLogger())
     context = SimpleNamespace(
         method="tools/call",
-        params={"name": "delete_instance", "arguments": {"instance_id": "i"}},
+        params={"name": tool_name, "arguments": {"instance_id": "i"}},
     )
     called = False
 

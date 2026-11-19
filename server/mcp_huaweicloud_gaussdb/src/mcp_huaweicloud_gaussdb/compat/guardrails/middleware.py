@@ -85,7 +85,7 @@ class GuardrailsMiddleware:
 
     def _evaluate_call(self, call: _ToolCall) -> tuple[str, list[RuleHit], Any]:
         try:
-            pre = self._pre_check(call.name, call.risk, call.arguments)
+            action, hits = self._pre_check(call.name, call.risk, call.arguments)
         except McpToolError as exc:
             return "blocked", [], _wrap_error_payload(exc.to_dict())
         except Exception as exc:
@@ -98,9 +98,6 @@ class GuardrailsMiddleware:
             )
             return "fail_closed", [], _wrap_error_payload(error.to_dict())
 
-        if pre is None:
-            return "allowed", [], None
-        action, hits = pre
         if action == "block":
             strictest = strictest_hit(hits)
             message = strictest.rule.message if strictest else "Blocked by guardrail rule."
@@ -144,7 +141,7 @@ class GuardrailsMiddleware:
         tool_name: str,
         risk: ToolRisk | None,
         arguments: dict[str, Any],
-    ) -> tuple[str, list[RuleHit]] | None:
+    ) -> tuple[str, list[RuleHit]]:
         if risk is None:
             raise McpToolError(
                 code="MCP_GUARDRAIL_ERROR",
@@ -168,7 +165,7 @@ class GuardrailsMiddleware:
             if not tool_supports_confirm(tool_name):
                 return "block", hits
             if confirmed:
-                return None
+                return "allow", []
         if risk is ToolRisk.DANGEROUS and not confirmed and action != "block":
             if not hits and not tool_supports_confirm(tool_name):
                 raise McpToolError(
@@ -176,7 +173,7 @@ class GuardrailsMiddleware:
                     "Confirmation is required but this tool has no confirm parameter.",
                 )
             return "confirm", hits
-        return (action, hits) if hits else None
+        return action, hits
 
     def _post_process(self, result: Any, warn_hits: list[RuleHit]) -> Any:
         # The MCP SDK can return a wire envelope before giving us a structured result.
