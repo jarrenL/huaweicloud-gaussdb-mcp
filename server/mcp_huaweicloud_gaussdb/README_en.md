@@ -4,7 +4,7 @@
 
 ## Version
 
-Package: `mcp_huaweicloud_gaussdb`; current version: `0.8.1`; Python `3.10+`; MCP Python SDK `2.x`.
+Package: `mcp_huaweicloud_gaussdb`; current version: `0.1.0`; Python `3.10+`; MCP Python SDK `2.x`.
 
 ## Overview
 
@@ -189,7 +189,7 @@ mcp_huaweicloud_gaussdb
 Run from a checkout that contains the GaussDB service:
 
 ```bash
-cd /absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb
+cd /absolute/path/to/huaweicloud-mcp/server/mcp_huaweicloud_gaussdb
 uv sync --frozen
 uv run mcp_huaweicloud_gaussdb
 ```
@@ -201,7 +201,7 @@ Source-checkout client configuration (also works with this integration branch be
   "mcpServers": {
     "huaweicloud-gaussdb": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb", "mcp_huaweicloud_gaussdb"],
+      "args": ["run", "--directory", "/absolute/path/to/huaweicloud-mcp/server/mcp_huaweicloud_gaussdb", "mcp_huaweicloud_gaussdb"],
       "env": {"HUAWEICLOUD_MCP_READ_ONLY": "true"}
     }
   }
@@ -276,9 +276,13 @@ Map permissions to each enabled API using the official [permissions reference](h
 
 ```bash
 # From the repository root:
-bash scripts/test.sh gaussdb
-uv run --directory server/mcp_server_gaussdb python scripts/check_quality.py
-uv build --directory server/mcp_server_gaussdb
+cd server/mcp_huaweicloud_gaussdb
+uv sync --frozen
+uv run --frozen ruff check src tests scripts
+uv run --frozen mypy src tests
+uv run --frozen pytest
+uv run --frozen python scripts/check_quality.py
+uv build
 ```
 
 Default tests do not access cloud resources. Live validation must be explicitly enabled in a dedicated test account. Any billable resource must be cleaned up on failure as well as success, and its deletion job must reach a terminal state. Before release, also verify wheel metadata, installation in a clean Python 3.10 environment, the MCP tool list, and the absence of credentials or resource identifiers in deliverables.

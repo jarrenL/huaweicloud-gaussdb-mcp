@@ -25,7 +25,7 @@
 
 ### 数据库
 
-- **[GaussDB MCP](server/mcp_server_gaussdb/README.md)**：主要能力包含实例管理、备份、参数管理、慢 SQL 分析和监控。
+- **[GaussDB MCP](server/mcp_huaweicloud_gaussdb/README.md)**：主要能力包含实例管理、备份、参数管理、慢 SQL 分析和监控。
 
 ## 开发者文档
 

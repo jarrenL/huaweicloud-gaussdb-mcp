@@ -18,7 +18,7 @@ Huawei Cloud MCP Server shared repository: provides MCP tools for each Huawei Cl
 
 ### Database
 
-- **[GaussDB MCP](server/mcp_server_gaussdb/README_en.md)**: Main capabilities include instance management, backups, parameter management, slow SQL analysis, and monitoring.
+- **[GaussDB MCP](server/mcp_huaweicloud_gaussdb/README_en.md)**: Main capabilities include instance management, backups, parameter management, slow SQL analysis, and monitoring.
 
 ## Developer Documentation
 

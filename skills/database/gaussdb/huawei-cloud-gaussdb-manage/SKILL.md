@@ -56,7 +56,7 @@ GaussDB、BSS、CES、VPC 和 IAM 服务。Skill 不保存会话状态；区域�
 
 ## 前置条件
 
-1. Python 3.10+ 和 `uv` 已安装；MCP Server 至少为 `0.8.0`。以运行时
+1. Python 3.10+ 和 `uv` 已安装；使用 `mcp_huaweicloud_gaussdb` 的 `0.1.0` 或后续兼容版本。以运行时
    `initialize` 和 `tools/list` 返回的版本与工具清单为准，不把文档中的工具数量当作固定上限。
 2. MCP 客户端已经注册 `huaweicloud-gaussdb` 服务。安装和注册方法见
    [references/mcp-installation-guide.md](references/mcp-installation-guide.md)。
@@ -279,7 +279,7 @@ GaussDB、BSS、CES、VPC 和 IAM 服务。Skill 不保存会话状态；区域�
 - 不在 Skill、示例、日志或回复中保存真实 AK/SK、SecurityToken、数据库密码或完整慢 SQL。
 - 删除实例、订单付款和取消订单前，必须核对精确资源并显式确认。
 
-## 0.8.0 安全约束
+## 安全约束
 
 - 保持环境变量 → MCP 凭证文件 → devkit S1 的优先级；AK/SK/STS Token 来自同一来源，不完整时报错。
 - 创建、变更请求的 `is_auto_pay`、`is_auto_renew` 保持 false。获取待支付订单后，按订单、金额、币种取得用户授权，再调用 `pay_order`。`confirm=true` 本身不证明已经获得用户授权。

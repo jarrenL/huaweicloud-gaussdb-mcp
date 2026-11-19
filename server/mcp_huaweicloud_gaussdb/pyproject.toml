@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp_huaweicloud_gaussdb"
-version = "0.8.1"
+version = "0.1.0"
 description = "Huawei Cloud GaussDB management MCP Server"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,7 +28,6 @@ dependencies = [
 
 [project.scripts]
 mcp_huaweicloud_gaussdb = "mcp_huaweicloud_gaussdb.main:main"
-mcp_server_gaussdb = "mcp_huaweicloud_gaussdb.main:main"
 
 [dependency-groups]
 dev = [

@@ -4,7 +4,7 @@
 
 ## 版本
 
-包名：`mcp_huaweicloud_gaussdb`；当前版本：`0.8.1`；Python `3.10+`；MCP Python SDK `2.x`。
+包名：`mcp_huaweicloud_gaussdb`；当前版本：`0.1.0`；Python `3.10+`；MCP Python SDK `2.x`。
 
 ## 概述
 
@@ -223,7 +223,7 @@ mcp_huaweicloud_gaussdb
 从包含 GaussDB 服务的源码工作区运行：
 
 ```bash
-cd /absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb
+cd /absolute/path/to/huaweicloud-mcp/server/mcp_huaweicloud_gaussdb
 uv sync --frozen
 uv run mcp_huaweicloud_gaussdb
 ```
@@ -235,7 +235,7 @@ uv run mcp_huaweicloud_gaussdb
   "mcpServers": {
     "huaweicloud-gaussdb": {
       "command": "uv",
-      "args": ["run", "--directory", "/absolute/path/to/huaweicloud-mcp/server/mcp_server_gaussdb", "mcp_huaweicloud_gaussdb"],
+      "args": ["run", "--directory", "/absolute/path/to/huaweicloud-mcp/server/mcp_huaweicloud_gaussdb", "mcp_huaweicloud_gaussdb"],
       "env": {"HUAWEICLOUD_MCP_READ_ONLY": "true"}
     }
   }
@@ -370,10 +370,14 @@ mcp_huaweicloud_gaussdb -t streamable-http
 ## 开发、测试和发布
 
 ```bash
-# From the repository root:
-bash scripts/test.sh gaussdb
-uv run --directory server/mcp_server_gaussdb python scripts/check_quality.py
-uv build --directory server/mcp_server_gaussdb
+# 在仓库根目录执行：
+cd server/mcp_huaweicloud_gaussdb
+uv sync --frozen
+uv run --frozen ruff check src tests scripts
+uv run --frozen mypy src tests
+uv run --frozen pytest
+uv run --frozen python scripts/check_quality.py
+uv build
 ```
 
 默认测试不访问云上资源。Live 验证只能在专用测试账号中显式启用；创建计费资源时必须在失败路径也执行清理，并确认删除任务到达终态。发布前还应检查 wheel 元数据、全新 Python 3.10 环境安装、MCP 工具列表，以及交付包中是否存在凭证和资源标识。

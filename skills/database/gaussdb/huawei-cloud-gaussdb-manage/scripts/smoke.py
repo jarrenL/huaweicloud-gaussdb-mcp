@@ -7,7 +7,7 @@ It prints only counts and status values, never resource records or credentials.
 
 Examples:
     uv run python scripts/smoke.py -- \
-        uv run --directory /path/to/huaweicloud-mcp/server/mcp_server_gaussdb \
+        uv run --directory /path/to/huaweicloud-mcp/server/mcp_huaweicloud_gaussdb \
         mcp_huaweicloud_gaussdb
 
     uv run --with 'mcp>=1,<3' python scripts/smoke.py

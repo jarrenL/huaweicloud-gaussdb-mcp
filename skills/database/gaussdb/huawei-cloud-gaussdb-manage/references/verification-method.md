@@ -28,9 +28,9 @@ python3 scripts/validate-skill.py
 从 MCP 仓库根目录执行：
 
 ```bash
-uv run --directory server/mcp_server_gaussdb python \
+uv run --directory server/mcp_huaweicloud_gaussdb python \
   "$PWD/skills/database/gaussdb/huawei-cloud-gaussdb-manage/scripts/smoke.py" \
-  -- uv run --directory "$PWD/server/mcp_server_gaussdb" mcp_huaweicloud_gaussdb
+  -- uv run --directory "$PWD/server/mcp_huaweicloud_gaussdb" mcp_huaweicloud_gaussdb
 ```
 
 脚本强制子进程使用 `HUAWEICLOUD_MCP_READ_ONLY=true`，并依次完成：
@@ -54,8 +54,8 @@ uv run --with 'mcp>=1,<3' python scripts/smoke.py -- \
 ## 3. MCP 手动启动验证
 
 ```bash
-uv sync --directory server/mcp_server_gaussdb --frozen
-uv run --directory server/mcp_server_gaussdb mcp_huaweicloud_gaussdb
+uv sync --directory server/mcp_huaweicloud_gaussdb --frozen
+uv run --directory server/mcp_huaweicloud_gaussdb mcp_huaweicloud_gaussdb
 ```
 
 通过 MCP 客户端完成 initialize 和 tools/list。成功标准：服务正常启动，返回不少于 23 个
