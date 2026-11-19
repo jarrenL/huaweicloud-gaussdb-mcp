@@ -4,10 +4,11 @@ import asyncio
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpSettings, McpToolError
+from huaweicloud_mcp_core import McpToolError
 from mcp import Client
 
 from mcp_huaweicloud_gaussdb.client.bss_client import BssOrderClient
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 from mcp_huaweicloud_gaussdb.service.billing_service import BillingService
 from tests.test_billing import ORDER, FakeBss, response
 
@@ -232,9 +233,8 @@ async def test_payment_confirmation_and_readonly_do_not_reach_cloud() -> None:
     from types import SimpleNamespace
     from typing import cast
 
-    from huaweicloud_mcp_core.guardrails.audit import AuditLogger
-    from huaweicloud_mcp_core.guardrails.middleware import GuardrailsMiddleware
-
+    from mcp_huaweicloud_gaussdb.compat.guardrails.audit import AuditLogger
+    from mcp_huaweicloud_gaussdb.compat.guardrails.middleware import GuardrailsMiddleware
     from mcp_huaweicloud_gaussdb.server import mcp
 
     async with Client(mcp) as client:

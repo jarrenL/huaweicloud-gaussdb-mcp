@@ -7,9 +7,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpSettings, ToolRisk
+from huaweicloud_mcp_core import ToolRisk
 
 from mcp_huaweicloud_gaussdb.client.gaussdb_client import GaussDBClient
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 from mcp_huaweicloud_gaussdb.service.gaussdb_service import GaussDBService
 from mcp_huaweicloud_gaussdb.service.openapi_service import OpenApiService
 

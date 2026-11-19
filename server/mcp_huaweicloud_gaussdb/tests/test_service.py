@@ -4,8 +4,9 @@ from copy import deepcopy
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpToolError, ProjectContext
+from huaweicloud_mcp_core import McpToolError
 
+from mcp_huaweicloud_gaussdb.compat.credentials import ProjectContext
 from mcp_huaweicloud_gaussdb.service.gaussdb_service import (
     GaussDBService,
     _parameter_risk_reasons,

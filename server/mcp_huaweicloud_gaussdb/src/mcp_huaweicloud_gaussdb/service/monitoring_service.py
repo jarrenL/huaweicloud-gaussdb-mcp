@@ -4,7 +4,8 @@ import math
 import re
 from typing import Any
 
-from huaweicloud_mcp_core import McpToolError, clamp_limit, page_result
+from huaweicloud_mcp_core import McpToolError, page_result
+from huaweicloud_mcp_core.output import clamp_limit
 
 from ..client.ces_client import CesMonitoringClient
 from .time_utils import normalize_time_ms

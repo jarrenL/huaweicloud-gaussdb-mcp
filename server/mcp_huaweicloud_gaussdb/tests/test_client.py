@@ -3,7 +3,7 @@
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpSettings, McpToolError
+from huaweicloud_mcp_core import McpToolError
 
 from mcp_huaweicloud_gaussdb.client.gaussdb_client import (
     GaussDBClient,
@@ -11,6 +11,7 @@ from mcp_huaweicloud_gaussdb.client.gaussdb_client import (
     sdk_to_dict,
 )
 from mcp_huaweicloud_gaussdb.client.vpc_client import VpcResourceClient
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 
 
 class RecordingSdkClient:

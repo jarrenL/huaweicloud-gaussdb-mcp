@@ -4,7 +4,8 @@ import os
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpSettings
+
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +20,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "HUAWEICLOUD_DOMAIN_ID",
         "HUAWEICLOUD_SECURITY_TOKEN",
         "HUAWEICLOUD_ENDPOINT",
+        "HUAWEICLOUD_IAM_ENDPOINT",
         "HUAWEICLOUD_CES_ENDPOINT",
         "HUAWEICLOUD_BSS_ENDPOINT",
         "HUAWEICLOUD_MCP_CREDENTIALS_FILE",
@@ -30,8 +32,11 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "HUAWEICLOUD_MCP_PROTECTED_TAGS",
         "HUAWEICLOUD_MCP_GUARDRAILS_CONFIG",
         "HUAWEICLOUD_MCP_AUDIT_FILE",
+        "HUAWEICLOUD_MCP_HTTP_TOKEN",
         "MCP_SERVER_HOST",
         "MCP_SERVER_PORT",
+        "MCP_SERVER_ALLOWED_HOSTS",
+        "MCP_SERVER_ALLOWED_ORIGINS",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("HUAWEICLOUD_SKIP_DEVKIT_CREDENTIALS", "1")

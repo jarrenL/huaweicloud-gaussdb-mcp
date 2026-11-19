@@ -5,10 +5,11 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Any, TypeGuard
 
-from huaweicloud_mcp_core import McpToolError, clamp_limit, page_result, single_result
-from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
+from huaweicloud_mcp_core import McpToolError, page_result, single_result
+from huaweicloud_mcp_core.output import clamp_limit
 
 from ..client.bss_client import BssOrderClient
+from ..compat.guardrails.protect import assert_not_protected
 
 _GAUSSDB = "hws.service.type.gaussdb"
 _ORDER_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")

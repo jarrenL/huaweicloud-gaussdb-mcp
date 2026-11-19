@@ -5,17 +5,13 @@ import re
 import time
 from typing import Any
 
-from huaweicloud_mcp_core import (
-    McpSettings,
-    McpToolError,
-    clamp_limit,
-    page_result,
-    single_result,
-)
-from huaweicloud_mcp_core.guardrails.protect import assert_not_protected
+from huaweicloud_mcp_core import McpToolError, page_result, single_result
+from huaweicloud_mcp_core.output import clamp_limit
 
 from ..client.gaussdb_client import GaussDBClient
 from ..client.vpc_client import VpcResourceClient
+from ..compat.guardrails.protect import assert_not_protected
+from ..compat.settings import McpSettings
 from .create_common import (
     _FLAVOR_FIELDS,
     _pick,

@@ -5,10 +5,11 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from huaweicloud_mcp_core import McpSettings, McpToolError
+from huaweicloud_mcp_core import McpToolError
 from mcp import Client
 
 from mcp_huaweicloud_gaussdb.client.bss_client import BssOrderClient
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 from mcp_huaweicloud_gaussdb.service.billing_service import BillingService
 
 ORDER = "CS202610300000EXAMPLE"
@@ -292,8 +293,8 @@ async def test_cancellation_requires_confirmation_without_cloud_access() -> None
 
 
 async def test_readonly_blocks_order_cancellation_before_bss_access() -> None:
-    from huaweicloud_mcp_core.guardrails.audit import AuditLogger
-    from huaweicloud_mcp_core.guardrails.middleware import GuardrailsMiddleware
+    from mcp_huaweicloud_gaussdb.compat.guardrails.audit import AuditLogger
+    from mcp_huaweicloud_gaussdb.compat.guardrails.middleware import GuardrailsMiddleware
 
     context = SimpleNamespace(
         method="tools/call",

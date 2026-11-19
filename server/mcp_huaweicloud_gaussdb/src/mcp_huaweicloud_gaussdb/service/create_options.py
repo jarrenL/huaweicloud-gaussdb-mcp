@@ -4,18 +4,14 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
-from huaweicloud_mcp_core import (
-    McpSettings,
-    McpToolError,
-    ProjectContext,
-    clamp_limit,
-    resolve_project_context,
-    run_sdk_call,
-    single_result,
-)
+from huaweicloud_mcp_core import McpToolError, single_result
+from huaweicloud_mcp_core.output import clamp_limit
 
 from ..client.gaussdb_client import GaussDBClient
 from ..client.vpc_client import VpcResourceClient
+from ..compat.credentials import ProjectContext, resolve_project_context
+from ..compat.runtime import run_sdk_call
+from ..compat.settings import McpSettings
 from .create_common import (
     _DEPLOYMENT_ALIASES,
     _DEPLOYMENT_FORMS,

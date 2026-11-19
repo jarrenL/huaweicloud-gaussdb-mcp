@@ -3,15 +3,11 @@
 import os
 from typing import Any, cast
 
-from huaweicloud_mcp_core import (
-    CredentialScope,
-    McpSettings,
-    McpToolError,
-    build_credentials,
-    run_sdk_call,
-    wrap_sdk_error,
-)
+from huaweicloud_mcp_core import CredentialScope, McpToolError, wrap_sdk_error
 
+from ..compat.credentials import build_credentials
+from ..compat.runtime import run_sdk_call
+from ..compat.settings import McpSettings
 from .gaussdb_client import sdk_to_dict
 
 

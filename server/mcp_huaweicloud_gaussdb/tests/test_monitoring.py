@@ -5,10 +5,11 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
-from huaweicloud_mcp_core import McpSettings, McpToolError
+from huaweicloud_mcp_core import McpToolError
 from mcp import Client
 
 from mcp_huaweicloud_gaussdb.client.ces_client import CesMonitoringClient
+from mcp_huaweicloud_gaussdb.compat.settings import McpSettings
 from mcp_huaweicloud_gaussdb.service.monitoring_service import GAUSSDB_NAMESPACE, MonitoringService
 from mcp_huaweicloud_gaussdb.tools import monitoring
 
@@ -401,7 +402,7 @@ async def test_monitoring_client_is_lazy_and_default_uses_current_credentials(
 async def test_monitoring_tools_work_through_read_only_mcp_middleware(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from huaweicloud_mcp_core import build_server
+    from mcp_huaweicloud_gaussdb.compat.server import build_server
 
     fake = FakeCesClient()
     fake.list_response = {"metrics": [METRIC]}

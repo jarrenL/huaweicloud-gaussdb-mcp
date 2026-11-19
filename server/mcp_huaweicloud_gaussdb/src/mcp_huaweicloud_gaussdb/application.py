@@ -1,8 +1,7 @@
 """Shared server instance, independent of tool registration."""
 
-from huaweicloud_mcp_core import build_server
-
 from . import __version__
+from .compat.server import build_server
 
 mcp = build_server(
     "gaussdb",

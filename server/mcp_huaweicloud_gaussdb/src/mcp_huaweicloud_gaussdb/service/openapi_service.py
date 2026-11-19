@@ -2,11 +2,12 @@
 
 from typing import Any
 
-from huaweicloud_mcp_core import McpToolError, ToolRisk, clamp_limit, page_result, single_result
-from huaweicloud_mcp_core.guardrails.protect import extract_tag_set, match_resource
-from huaweicloud_mcp_core.guardrails.rules import Rule, load_rules
+from huaweicloud_mcp_core import McpToolError, ToolRisk, page_result, single_result
+from huaweicloud_mcp_core.guardrails.rules import Rule
+from huaweicloud_mcp_core.output import clamp_limit
 
 from ..client.gaussdb_client import GaussDBClient
+from ..compat.guardrails.protect import extract_tag_set, load_rules, match_resource
 from ..openapi_catalog import get_operation, operation_schema, operations
 from .write_safety import require_manual_payment
 
