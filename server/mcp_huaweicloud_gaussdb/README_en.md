@@ -4,7 +4,7 @@
 
 ## Version
 
-Package: `mcp_huaweicloud_gaussdb`; current version: `0.1.0`; Python `3.10+`; MCP Python SDK `>=2.2,<3`.
+Package: `mcp_huaweicloud_gaussdb`; current version: `0.1.1`; Python `3.10+`; MCP Python SDK `>=2.2,<3`.
 
 Compatible with the official `huaweicloud-mcp-core` `1.0.0`. Installing GaussDB MCP also installs its core dependency.
 

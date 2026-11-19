@@ -57,7 +57,7 @@ def test_token_host_origin_and_body_limit_are_enforced() -> None:
         assert client.post("/mcp", json=oversized, headers=headers).status_code == 413
         response = client.post("/mcp", json=initialize, headers=headers)
         assert response.status_code == 200
-        assert "huaweicloud-gaussdb" in response.text and '"version":"0.1.0"' in response.text
+        assert "huaweicloud-gaussdb" in response.text and '"version":"0.1.1"' in response.text
 
 
 def test_local_hostname_needs_no_token() -> None:
